@@ -3,11 +3,47 @@
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 
-// Define proper types for Leaflet - using any for compatibility with dynamic import
-type LeafletMap = any;
-type LeafletMarker = any;
-type LeafletIcon = any;
-type LeafletLibrary = any;
+// Define minimal types for Leaflet objects
+interface LeafletMap {
+  remove(): void;
+  invalidateSize(): void;
+}
+
+interface LeafletMarker {
+  setIcon(icon: unknown): void;
+}
+
+interface LeafletDivIcon {
+  // Minimal interface for div icon
+}
+
+interface LeafletLibrary {
+  map(element: HTMLElement, options: Record<string, unknown>): LeafletMap;
+  tileLayer(
+    url: string,
+    options: Record<string, unknown>
+  ): {
+    addTo(map: LeafletMap): void;
+  };
+  marker(
+    latlng: [number, number],
+    options: { icon: unknown }
+  ): LeafletMarker & {
+    addTo(map: LeafletMap): LeafletMarker;
+  };
+  divIcon(options: {
+    html: string;
+    className: string;
+    iconSize: [number, number];
+    iconAnchor: [number, number];
+  }): LeafletDivIcon;
+  Icon: {
+    Default: {
+      prototype: Record<string, unknown>;
+      mergeOptions(options: Record<string, string>): void;
+    };
+  };
+}
 
 interface LeafletMapProps {
   onMapClick: (e: React.MouseEvent<HTMLDivElement>) => void;
@@ -34,6 +70,7 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ onMapClick, rotation }) => {
       const leaflet = await import("leaflet");
 
       // Fix for default markers
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (leaflet.default.Icon.Default.prototype as any)._getIconUrl;
       leaflet.default.Icon.Default.mergeOptions({
         iconRetinaUrl:
@@ -44,6 +81,7 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ onMapClick, rotation }) => {
           "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setL(leaflet.default as any);
     };
 
@@ -72,7 +110,7 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ onMapClick, rotation }) => {
       ).addTo(map);
 
       // Create custom directional icon
-      const createDirectionalIcon = (rotation: number): any => {
+      const createDirectionalIcon = (rotation: number): LeafletDivIcon => {
         return L.divIcon({
           html: `
             <div style="
@@ -138,7 +176,7 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ onMapClick, rotation }) => {
   useEffect(() => {
     if (!L || !markerRef.current) return;
 
-    const createDirectionalIcon = (rotation: number): any => {
+    const createDirectionalIcon = (rotation: number): LeafletDivIcon => {
       return L.divIcon({
         html: `
           <div style="
