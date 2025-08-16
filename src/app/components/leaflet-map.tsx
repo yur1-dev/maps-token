@@ -14,7 +14,12 @@ interface LeafletMarker {
 }
 
 interface LeafletDivIcon {
-  // Interface for div icon
+  options: {
+    html: string;
+    className: string;
+    iconSize: [number, number];
+    iconAnchor: [number, number];
+  };
 }
 
 interface LeafletLibrary {
