@@ -3,22 +3,23 @@
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 
+// Define proper types for Leaflet - using any for compatibility with dynamic import
+type LeafletMap = any;
+type LeafletMarker = any;
+type LeafletIcon = any;
+type LeafletLibrary = any;
+
 interface LeafletMapProps {
   onMapClick: (e: React.MouseEvent<HTMLDivElement>) => void;
-  currentPosition: { x: number; y: number };
   rotation: number;
 }
 
-const LeafletMap: React.FC<LeafletMapProps> = ({
-  onMapClick,
-  currentPosition,
-  rotation,
-}) => {
+const LeafletMap: React.FC<LeafletMapProps> = ({ onMapClick, rotation }) => {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const markerRef = useRef<any>(null);
+  const mapInstanceRef = useRef<LeafletMap | null>(null);
+  const markerRef = useRef<LeafletMarker | null>(null);
   const [isClient, setIsClient] = useState(false);
-  const [L, setL] = useState<any>(null);
+  const [L, setL] = useState<LeafletLibrary | null>(null);
 
   // Ensure we're on the client side
   useEffect(() => {
@@ -43,7 +44,7 @@ const LeafletMap: React.FC<LeafletMapProps> = ({
           "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
       });
 
-      setL(leaflet.default);
+      setL(leaflet.default as any);
     };
 
     loadLeaflet();
@@ -71,7 +72,7 @@ const LeafletMap: React.FC<LeafletMapProps> = ({
       ).addTo(map);
 
       // Create custom directional icon
-      const createDirectionalIcon = (rotation: number) => {
+      const createDirectionalIcon = (rotation: number): any => {
         return L.divIcon({
           html: `
             <div style="
@@ -137,7 +138,7 @@ const LeafletMap: React.FC<LeafletMapProps> = ({
   useEffect(() => {
     if (!L || !markerRef.current) return;
 
-    const createDirectionalIcon = (rotation: number) => {
+    const createDirectionalIcon = (rotation: number): any => {
       return L.divIcon({
         html: `
           <div style="
