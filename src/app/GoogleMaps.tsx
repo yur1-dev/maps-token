@@ -20,9 +20,6 @@ const GoogleStreetView360 = () => {
   const [viewMode, setViewMode] = useState<
     "normal" | "fisheye" | "stereographic" | "littlePlanet"
   >("normal");
-  const [mapType, setMapType] = useState<"satellite" | "terrain" | "roadmap">(
-    "satellite"
-  );
   const [isDraggingPegman, setIsDraggingPegman] = useState(false);
   const [pegmanPosition, setPegmanPosition] = useState({ x: 50, y: 50 });
   const [mapZoom, setMapZoom] = useState(1);
@@ -321,10 +318,6 @@ const GoogleStreetView360 = () => {
     }
   };
 
-  const toggleMiniMap = () => {
-    setShowMiniMap(!showMiniMap);
-  };
-
   const closeMiniMap = () => {
     setShowMiniMap(false);
   };
@@ -405,41 +398,6 @@ const GoogleStreetView360 = () => {
       x: ((e.clientX - rect.left) / rect.width) * 100,
       y: ((e.clientY - rect.top) / rect.height) * 100,
     });
-  }, []);
-
-  const handlePegmanMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (!isDraggingPegman) return;
-      e.stopPropagation();
-
-      const rect = e.currentTarget.getBoundingClientRect();
-      const newX = Math.max(
-        0,
-        Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)
-      );
-      const newY = Math.max(
-        0,
-        Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)
-      );
-
-      setPegmanPosition({ x: newX, y: newY });
-
-      // Update camera rotation based on pegman position
-      const rotY = (newX / 100 - 0.5) * Math.PI * 2;
-      const rotX = (newY / 100 - 0.5) * Math.PI;
-
-      targetRotationRef.current.y = rotY;
-      targetRotationRef.current.x = Math.max(
-        -Math.PI / 2,
-        Math.min(Math.PI / 2, rotX)
-      );
-      setCompassRotation(-rotY * (180 / Math.PI));
-    },
-    [isDraggingPegman]
-  );
-
-  const handlePegmanMouseUp = useCallback(() => {
-    setIsDraggingPegman(false);
   }, []);
 
   useEffect(() => {
@@ -535,18 +493,6 @@ const GoogleStreetView360 = () => {
     };
   }, [showMiniMap, isDraggingPegman]);
 
-  // Satellite view background style
-  const satelliteStyle = {
-    backgroundImage: `
-      radial-gradient(circle at 20% 30%, #1e3a8a 0%, #1e40af 25%, #2563eb 50%),
-      radial-gradient(circle at 80% 20%, #0ea5e9 0%, #38bdf8 30%),
-      linear-gradient(180deg, #0c4a6e 0%, #0369a1 20%, #0284c7 40%, #06b6d4 60%, #fbbf24 70%, #f59e0b 80%, #84cc16 90%, #65a30d 100%)
-    `,
-    backgroundSize: "100% 40%, 100% 30%, 100% 100%",
-    backgroundPosition: "0% 0%, 0% 0%, 0% 0%",
-    backgroundBlendMode: "overlay, multiply, normal",
-  };
-
   return (
     <div className="relative w-full h-screen overflow-hidden bg-black select-none">
       <div
@@ -607,7 +553,15 @@ const GoogleStreetView360 = () => {
             (mode) => (
               <button
                 key={mode}
-                onClick={() => handleViewModeChange(mode as any)}
+                onClick={() =>
+                  handleViewModeChange(
+                    mode as
+                      | "normal"
+                      | "fisheye"
+                      | "stereographic"
+                      | "littlePlanet"
+                  )
+                }
                 className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer ${
                   viewMode === mode
                     ? "bg-blue-50 text-blue-600"
