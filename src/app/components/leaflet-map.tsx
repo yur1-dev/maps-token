@@ -3,18 +3,18 @@
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 
-// Define minimal types for Leaflet objects
+// Define proper types for Leaflet objects
 interface LeafletMap {
   remove(): void;
   invalidateSize(): void;
 }
 
 interface LeafletMarker {
-  setIcon(icon: unknown): void;
+  setIcon(icon: LeafletDivIcon): void;
 }
 
 interface LeafletDivIcon {
-  // Minimal interface for div icon
+  // Interface for div icon
 }
 
 interface LeafletLibrary {
@@ -27,7 +27,7 @@ interface LeafletLibrary {
   };
   marker(
     latlng: [number, number],
-    options: { icon: unknown }
+    options: { icon: LeafletDivIcon }
   ): LeafletMarker & {
     addTo(map: LeafletMap): LeafletMarker;
   };
@@ -67,22 +67,32 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ onMapClick, rotation }) => {
     if (!isClient) return;
 
     const loadLeaflet = async () => {
-      const leaflet = await import("leaflet");
+      try {
+        const leaflet = await import("leaflet");
 
-      // Fix for default markers
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      delete (leaflet.default.Icon.Default.prototype as any)._getIconUrl;
-      leaflet.default.Icon.Default.mergeOptions({
-        iconRetinaUrl:
-          "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-        iconUrl:
-          "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-        shadowUrl:
-          "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-      });
+        // Fix for default markers - use proper type assertion
+        interface LeafletIconDefault {
+          _getIconUrl?: () => string;
+        }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setL(leaflet.default as any);
+        // Remove the _getIconUrl method
+        const iconPrototype = leaflet.default.Icon.Default
+          .prototype as LeafletIconDefault;
+        delete iconPrototype._getIconUrl;
+
+        leaflet.default.Icon.Default.mergeOptions({
+          iconRetinaUrl:
+            "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+          iconUrl:
+            "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+          shadowUrl:
+            "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+        });
+
+        setL(leaflet.default as unknown as LeafletLibrary);
+      } catch (error) {
+        console.error("Failed to load Leaflet:", error);
+      }
     };
 
     loadLeaflet();
@@ -110,7 +120,7 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ onMapClick, rotation }) => {
       ).addTo(map);
 
       // Create custom directional icon
-      const createDirectionalIcon = (rotation: number): LeafletDivIcon => {
+      const createDirectionalIcon = (rot: number): LeafletDivIcon => {
         return L.divIcon({
           html: `
             <div style="
@@ -121,7 +131,7 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ onMapClick, rotation }) => {
               border-radius: 50%; 
               position: relative;
               box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-              transform: rotate(${rotation}deg);
+              transform: rotate(${rot}deg);
             ">
               <div style="
                 position: absolute;
@@ -176,7 +186,7 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ onMapClick, rotation }) => {
   useEffect(() => {
     if (!L || !markerRef.current) return;
 
-    const createDirectionalIcon = (rotation: number): LeafletDivIcon => {
+    const createDirectionalIcon = (rot: number): LeafletDivIcon => {
       return L.divIcon({
         html: `
           <div style="
@@ -187,7 +197,7 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ onMapClick, rotation }) => {
             border-radius: 50%; 
             position: relative;
             box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            transform: rotate(${rotation}deg);
+            transform: rotate(${rot}deg);
           ">
             <div style="
               position: absolute;

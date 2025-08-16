@@ -45,6 +45,9 @@ const GoogleStreetView360 = () => {
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // Copy the container reference for cleanup
+    const container = containerRef.current;
+
     // Create scene
     const scene = new THREE.Scene();
     sceneRef.current = scene;
@@ -71,9 +74,9 @@ const GoogleStreetView360 = () => {
 
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.NoToneMapping;
-    renderer.toneMappingExposure = 1.1; // Reduced tone mapping exposure from 1.3 to 1.1 for slightly darker appearance
+    renderer.toneMappingExposure = 1.1;
 
-    containerRef.current.appendChild(renderer.domElement);
+    container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
     // Create video element
@@ -91,13 +94,13 @@ const GoogleStreetView360 = () => {
     texture.minFilter = THREE.LinearFilter;
     texture.magFilter = THREE.LinearFilter;
     texture.colorSpace = THREE.SRGBColorSpace;
-    texture.generateMipmaps = false; // Keep disabled for video sharpness
-    texture.anisotropy = renderer.capabilities.getMaxAnisotropy(); // Maximum anisotropic filtering
-    texture.flipY = true; // Fixed video orientation by enabling flipY
+    texture.generateMipmaps = false;
+    texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    texture.flipY = true;
     texture.needsUpdate = true;
 
-    const geometry = new THREE.SphereGeometry(500, 128, 64); // Doubled segments for smoother surface
-    geometry.scale(-1, 1, 1); // Invert the sphere so we see the inside
+    const geometry = new THREE.SphereGeometry(500, 128, 64);
+    geometry.scale(-1, 1, 1);
 
     // Create material with video texture
     const material = new THREE.MeshBasicMaterial({
@@ -154,8 +157,8 @@ const GoogleStreetView360 = () => {
       if (animationIdRef.current) {
         cancelAnimationFrame(animationIdRef.current);
       }
-      if (rendererRef.current && containerRef.current) {
-        containerRef.current.removeChild(rendererRef.current.domElement);
+      if (rendererRef.current && container) {
+        container.removeChild(rendererRef.current.domElement);
         rendererRef.current.dispose();
       }
       if (videoRef.current) {
