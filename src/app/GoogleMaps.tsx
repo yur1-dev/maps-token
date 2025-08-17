@@ -1,315 +1,152 @@
 "use client";
 
-import type React from "react";
-import { useState, useRef, useCallback, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
-const GoogleStreetView360 = () => {
+const MoonViewer = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [compassRotation, setCompassRotation] = useState(0);
-  const [showMiniMap, setShowMiniMap] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState(false);
-  const [contextMenuPosition, setContextMenuPosition] = useState<{
-    x: number;
-    y: number;
-  }>({ x: 0, y: 0 });
-  const [viewMode, setViewMode] = useState<
-    "normal" | "fisheye" | "stereographic" | "littlePlanet"
-  >("normal");
-  const [isDraggingPegman, setIsDraggingPegman] = useState(false);
-  const [pegmanPosition, setPegmanPosition] = useState({ x: 50, y: 50 });
-  const [mapZoom, setMapZoom] = useState(1);
-  const [isMapHovered, setIsMapHovered] = useState(false);
-
+  const [contextMenuPosition, setContextMenuPosition] = useState({
+    x: 0,
+    y: 0,
+  });
+  const [showShareMenu, setShowShareMenu] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<string[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [isClient, setIsClient] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const sphereRef = useRef<THREE.Mesh | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const moonRef = useRef<THREE.Group | null>(null);
   const animationIdRef = useRef<number | null>(null);
-
-  // Store rotation values
-  const rotationRef = useRef({ x: 0, y: 0 });
-  const targetRotationRef = useRef({ x: 0, y: 0 });
-
-  // Video from public folder
-  const video360Url = "/beach.mp4";
+  const controlsRef = useRef<any>(null);
+  const isUserInteractingRef = useRef(false);
+  const starFieldRef = useRef<any>(null);
 
   const handleSearch = (e: React.KeyboardEvent) => {
     e.preventDefault();
-    console.log("Searching for:", searchQuery);
-  };
+    if (searchQuery.trim()) {
+      // Mock search results for moon features
+      const moonFeatures = [
+        "Mare Tranquillitatis (Sea of Tranquility)",
+        "Tycho Crater",
+        "Copernicus Crater",
+        "Mare Imbrium (Sea of Rains)",
+        "Apollo 11 Landing Site",
+        "Oceanus Procellarum",
+        "Mare Serenitatis",
+        "Kepler Crater",
+        "Aristarchus Crater",
+        "Mare Crisium",
+      ];
 
-  // Initialize Three.js scene
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    const container = containerRef.current;
-    const scene = new THREE.Scene();
-    sceneRef.current = scene;
-
-    const camera = new THREE.PerspectiveCamera(
-      75,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      1000
-    );
-    camera.position.set(0, 0, 0.1);
-    cameraRef.current = camera;
-
-    const renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: false,
-      powerPreference: "high-performance",
-      preserveDrawingBuffer: true,
-    });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.NoToneMapping;
-    renderer.toneMappingExposure = 1.1;
-
-    container.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
-
-    const video = document.createElement("video");
-    video.src = video360Url;
-    video.crossOrigin = "anonymous";
-    video.loop = true;
-    video.muted = true;
-    video.playsInline = true;
-    video.autoplay = true;
-    videoRef.current = video;
-
-    const texture = new THREE.VideoTexture(video);
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.generateMipmaps = false;
-    texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    texture.flipY = true;
-    texture.needsUpdate = true;
-
-    const geometry = new THREE.SphereGeometry(500, 128, 64);
-    geometry.scale(-1, 1, 1);
-
-    const material = new THREE.MeshBasicMaterial({
-      map: texture,
-      side: THREE.DoubleSide,
-      transparent: false,
-      alphaTest: 0,
-      toneMapped: false,
-      fog: false,
-      depthWrite: true,
-      depthTest: true,
-    });
-
-    const sphere = new THREE.Mesh(geometry, material);
-    scene.add(sphere);
-    sphereRef.current = sphere;
-
-    // Add contract address text
-    const createTextGeometry = (
-      text: string,
-      position: THREE.Vector3,
-      rotation: THREE.Euler,
-      fontSize: number = 64
-    ) => {
-      const canvas = document.createElement("canvas");
-      const context = canvas.getContext("2d")!;
-      canvas.width = 2048;
-      canvas.height = 512;
-
-      context.fillStyle = "#2c1810";
-      context.font = `bold ${fontSize}px monospace`;
-      context.textAlign = "center";
-      context.textBaseline = "middle";
-      context.shadowColor = "#000000";
-      context.shadowBlur = 6;
-      context.shadowOffsetX = 3;
-      context.shadowOffsetY = 3;
-      context.fillText(text, canvas.width / 2, canvas.height / 2);
-
-      const textTexture = new THREE.CanvasTexture(canvas);
-      textTexture.needsUpdate = true;
-
-      const textGeometry = new THREE.PlaneGeometry(100, 25);
-      const textMaterial = new THREE.MeshBasicMaterial({
-        map: textTexture,
-        transparent: true,
-        alphaTest: 0.1,
-        side: THREE.DoubleSide,
-      });
-
-      const textMesh = new THREE.Mesh(textGeometry, textMaterial);
-      textMesh.position.copy(position);
-      textMesh.rotation.copy(rotation);
-
-      return textMesh;
-    };
-
-    const contractText = createTextGeometry(
-      "CA: 0x742d35Cc6634C0532925a3b8D63C4e64c6A6E6E2",
-      new THREE.Vector3(0, -50, -80),
-      new THREE.Euler(-Math.PI / 2.2, 0, 0),
-      56
-    );
-    scene.add(contractText);
-
-    const networkText = createTextGeometry(
-      "Pump.fun",
-      new THREE.Vector3(0, -65, -85),
-      new THREE.Euler(-Math.PI / 2.2, 0, 0),
-      48
-    );
-    scene.add(networkText);
-
-    video.play().catch((err) => {
-      console.log("Video playback failed, trying on user interaction", err);
-    });
-
-    const animate = () => {
-      animationIdRef.current = requestAnimationFrame(animate);
-
-      rotationRef.current.x +=
-        (targetRotationRef.current.x - rotationRef.current.x) * 0.1;
-      rotationRef.current.y +=
-        (targetRotationRef.current.y - rotationRef.current.y) * 0.1;
-
-      camera.rotation.order = "YXZ";
-      camera.rotation.y = rotationRef.current.y;
-      camera.rotation.x = rotationRef.current.x;
-      camera.rotation.z = 0;
-
-      renderer.render(scene, camera);
-    };
-    animate();
-
-    const handleResize = () => {
-      if (!cameraRef.current || !rendererRef.current) return;
-      cameraRef.current.aspect = window.innerWidth / window.innerHeight;
-      cameraRef.current.updateProjectionMatrix();
-      rendererRef.current.setSize(window.innerWidth, window.innerHeight);
-    };
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      if (animationIdRef.current) {
-        cancelAnimationFrame(animationIdRef.current);
-      }
-      if (rendererRef.current && container) {
-        container.removeChild(rendererRef.current.domElement);
-        rendererRef.current.dispose();
-      }
-      if (videoRef.current) {
-        videoRef.current.pause();
-        videoRef.current.src = "";
-      }
-    };
-  }, []);
-
-  // Update zoom
-  useEffect(() => {
-    if (cameraRef.current) {
-      const fov = 75 / zoom;
-      cameraRef.current.fov = Math.max(30, Math.min(110, fov));
-      cameraRef.current.updateProjectionMatrix();
-    }
-  }, [zoom]);
-
-  // Update view mode
-  useEffect(() => {
-    if (cameraRef.current) {
-      switch (viewMode) {
-        case "fisheye":
-          cameraRef.current.fov = 110 / zoom;
-          break;
-        case "stereographic":
-          cameraRef.current.fov = 120 / zoom;
-          break;
-        case "littlePlanet":
-          cameraRef.current.fov = 140 / zoom;
-          targetRotationRef.current.x = -Math.PI / 2;
-          break;
-        default:
-          cameraRef.current.fov = 75 / zoom;
-          break;
-      }
-      cameraRef.current.updateProjectionMatrix();
-    }
-  }, [viewMode, zoom]);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button === 0) {
-      e.preventDefault();
-      setIsDragging(true);
-      setDragStart({ x: e.clientX, y: e.clientY });
-    }
-  }, []);
-
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (!isDragging) return;
-
-      const deltaX = e.clientX - dragStart.x;
-      const deltaY = e.clientY - dragStart.y;
-
-      targetRotationRef.current.y += deltaX * 0.002;
-      targetRotationRef.current.x += deltaY * 0.002;
-
-      targetRotationRef.current.x = Math.max(
-        -Math.PI / 2,
-        Math.min(Math.PI / 2, targetRotationRef.current.x)
+      const filtered = moonFeatures.filter((feature) =>
+        feature.toLowerCase().includes(searchQuery.toLowerCase())
       );
 
-      setCompassRotation(-targetRotationRef.current.y * (180 / Math.PI));
-      setDragStart({ x: e.clientX, y: e.clientY });
-    },
-    [isDragging, dragStart]
-  );
+      setSearchResults(
+        filtered.length > 0 ? filtered : ["No lunar features found"]
+      );
+      setShowSearchResults(true);
+    }
+  };
 
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
+  const handleSearchResultClick = (result: string) => {
+    setSearchQuery(result);
+    setShowSearchResults(false);
+    // Simulate moving to location
+    if (controlsRef.current && moonRef.current) {
+      const randomRotation = Math.random() * Math.PI * 2;
+      moonRef.current.rotation.y = randomRotation;
+    }
+  };
 
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+  const handleMinimapClick = (e: React.MouseEvent) => {
+    if (!controlsRef.current || !cameraRef.current) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Adjust for header and footer areas
+    const headerHeight = 32; // 8 * 4 = 32px (h-8)
+    const footerHeight = 24; // 6 * 4 = 24px (h-6)
+    const mapHeight = rect.height - headerHeight - footerHeight;
+    const mapY = y - headerHeight;
+
+    if (mapY < 0 || mapY > mapHeight) return; // Click was in header/footer
+
+    // Convert click position to normalized coordinates
+    const normalizedX = (x / rect.width - 0.5) * 2;
+    const normalizedY = (mapY / mapHeight - 0.5) * 2;
+
+    // Update camera position based on minimap click
+    const azimuth = normalizedX * Math.PI;
+    const elevation = -normalizedY * Math.PI * 0.3; // Limit elevation range
+
+    const distance = cameraRef.current.position.length();
+    const newX = distance * Math.cos(elevation) * Math.sin(azimuth);
+    const newY = distance * Math.sin(elevation);
+    const newZ = distance * Math.cos(elevation) * Math.cos(azimuth);
+
+    // Smoothly move camera to new position
+    const startPos = cameraRef.current.position.clone();
+    const endPos = new THREE.Vector3(newX, newY, newZ);
+
+    // Simple animation
+    let progress = 0;
+    const animate = () => {
+      progress += 0.1;
+      if (progress <= 1) {
+        const currentPos = startPos.clone().lerp(endPos, progress);
+        cameraRef.current!.position.copy(currentPos);
+        controlsRef.current!.update();
+        requestAnimationFrame(animate);
+      }
+    };
+    animate();
+  };
+
+  // Fixed star positions for consistent SSR
+  const getFixedStarPositions = () => {
+    const positions = [];
+    const seed = 12345; // Fixed seed for consistency
+    let random = seed;
+
+    for (let i = 0; i < 15; i++) {
+      // Simple pseudo-random generator for consistent results
+      random = (random * 9301 + 49297) % 233280;
+      const x = (random / 233280) * 100;
+
+      random = (random * 9301 + 49297) % 233280;
+      const y = (random / 233280) * 100;
+
+      positions.push({ left: `${x}%`, top: `${y}%` });
+    }
+
+    return positions;
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setShowContextMenu(true);
     setContextMenuPosition({ x: e.clientX, y: e.clientY });
-  }, []);
+  };
 
-  const handleViewModeChange = (mode: typeof viewMode) => {
-    setViewMode(mode);
-    setShowContextMenu(false);
-
-    if (mode === "littlePlanet") {
-      targetRotationRef.current.x = -Math.PI / 2;
-    } else if (mode === "normal") {
-      targetRotationRef.current.x = 0;
+  const handleFullscreen = () => {
+    if (document.fullscreenEnabled && containerRef.current) {
+      containerRef.current.requestFullscreen().catch((err) => {
+        console.log("Fullscreen failed:", err);
+        alert("Fullscreen not supported or blocked");
+      });
+    } else {
+      alert("Fullscreen not supported by your browser");
     }
-  };
-
-  const handleZoomIn = () => {
-    setZoom((prev) => Math.min(3, prev + 0.2));
-  };
-
-  const handleZoomOut = () => {
-    setZoom((prev) => Math.max(0.5, prev - 0.2));
-  };
-
-  const handleMapZoomIn = () => {
-    setMapZoom((prev) => Math.min(3, prev + 0.5));
-  };
-
-  const handleMapZoomOut = () => {
-    setMapZoom((prev) => Math.max(0.5, prev - 0.5));
+    setShowContextMenu(false);
   };
 
   const handleClose = () => {
@@ -318,285 +155,683 @@ const GoogleStreetView360 = () => {
     }
   };
 
-  const closeMiniMap = () => {
-    setShowMiniMap(false);
+  // Create text geometry that appears on the Moon surface
+  const createTextOnSurface = (
+    text: string,
+    position: THREE.Vector3,
+    scene: THREE.Scene,
+    fontSize: number = 0.05
+  ) => {
+    // Create text using a canvas
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d")!;
+    canvas.width = 2048;
+    canvas.height = 256;
+
+    // Clear canvas first
+    context.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Set text style for better centering
+    context.fillStyle = "#ffffff";
+    context.font = `bold ${fontSize * 1000}px Arial, sans-serif`;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.shadowColor = "#000000";
+    context.shadowBlur = 15;
+    context.shadowOffsetX = 3;
+    context.shadowOffsetY = 3;
+
+    // Draw text at exact center
+    context.fillText(text, canvas.width / 2, canvas.height / 2);
+
+    // Create texture from canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    texture.flipY = true;
+
+    // Create material
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      alphaTest: 0.1,
+      side: THREE.DoubleSide,
+    });
+
+    // Create geometry with better proportions for closer text
+    const geometry = new THREE.PlaneGeometry(1.6, 0.2);
+    const textMesh = new THREE.Mesh(geometry, material);
+
+    // Position the text correctly in front of the moon
+    textMesh.position.copy(position);
+
+    // Make text face the camera properly
+    textMesh.lookAt(cameraRef.current?.position || new THREE.Vector3(0, 0, 5));
+
+    scene.add(textMesh);
+    return textMesh;
   };
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    if (e.deltaY < 0) {
-      handleZoomIn();
-    } else {
-      handleZoomOut();
+  // Create simple but beautiful star field without custom shaders
+  const createStarField = (scene: THREE.Scene) => {
+    // Create a simple circular texture for stars
+    const canvas = document.createElement("canvas");
+    canvas.width = 32;
+    canvas.height = 32;
+    const context = canvas.getContext("2d")!;
+
+    // Draw a simple white circle with soft edges
+    const gradient = context.createRadialGradient(16, 16, 0, 16, 16, 16);
+    gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
+    gradient.addColorStop(0.4, "rgba(255, 255, 255, 0.8)");
+    gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 32, 32);
+
+    const starTexture = new THREE.CanvasTexture(canvas);
+
+    // Create star geometry
+    const starGeometry = new THREE.BufferGeometry();
+    const starCount = 4000;
+    const positions = new Float32Array(starCount * 3);
+    const colors = new Float32Array(starCount * 3);
+
+    for (let i = 0; i < starCount; i++) {
+      // Generate random positions on a large sphere
+      const radius = 400;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(Math.random() * 2 - 1);
+
+      positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+      positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+      positions[i * 3 + 2] = radius * Math.cos(phi);
+
+      // Simple white colors with slight variations
+      const brightness = 0.7 + Math.random() * 0.3;
+      colors[i * 3] = brightness;
+      colors[i * 3 + 1] = brightness;
+      colors[i * 3 + 2] = brightness;
     }
-  }, []);
 
-  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(
-    null
-  );
+    starGeometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(positions, 3)
+    );
+    starGeometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    setTouchStart({ x: touch.clientX, y: touch.clientY });
-  }, []);
-
-  const handleTouchMove = useCallback(
-    (e: React.TouchEvent) => {
-      if (!touchStart) return;
-
-      const touch = e.touches[0];
-      const deltaX = touch.clientX - touchStart.x;
-      const deltaY = touch.clientY - touchStart.y;
-
-      targetRotationRef.current.y += deltaX * 0.002;
-      targetRotationRef.current.x += deltaY * 0.002;
-
-      targetRotationRef.current.x = Math.max(
-        -Math.PI / 2,
-        Math.min(Math.PI / 2, targetRotationRef.current.x)
-      );
-
-      setCompassRotation(-targetRotationRef.current.y * (180 / Math.PI));
-      setTouchStart({ x: touch.clientX, y: touch.clientY });
-    },
-    [touchStart]
-  );
-
-  const handleTouchEnd = useCallback(() => {
-    setTouchStart(null);
-  }, []);
-
-  // Mini map click handler
-  const handleMiniMapClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (!showMiniMap) return;
-
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width;
-      const y = (e.clientY - rect.top) / rect.height;
-
-      // Convert click position to rotation
-      const newY = (x - 0.5) * Math.PI * 2; // Full 360 degrees
-      const newX = (y - 0.5) * Math.PI; // Up/down looking
-
-      targetRotationRef.current.y = newY;
-      targetRotationRef.current.x = Math.max(
-        -Math.PI / 2,
-        Math.min(Math.PI / 2, newX)
-      );
-      setCompassRotation(-newY * (180 / Math.PI));
-    },
-    [showMiniMap]
-  );
-
-  // Pegman drag handlers
-  const handlePegmanMouseDown = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsDraggingPegman(true);
-    const rect = e.currentTarget.parentElement!.getBoundingClientRect();
-    setPegmanPosition({
-      x: ((e.clientX - rect.left) / rect.width) * 100,
-      y: ((e.clientY - rect.top) / rect.height) * 100,
+    // Use simple PointsMaterial with the texture
+    const starMaterial = new THREE.PointsMaterial({
+      size: 2,
+      map: starTexture,
+      transparent: true,
+      vertexColors: true,
+      blending: THREE.AdditiveBlending,
+      sizeAttenuation: true,
     });
+
+    const stars = new THREE.Points(starGeometry, starMaterial);
+    scene.add(stars);
+
+    // Add some brighter stars
+    const brightStarGeometry = new THREE.BufferGeometry();
+    const brightStarCount = 300;
+    const brightPositions = new Float32Array(brightStarCount * 3);
+    const brightColors = new Float32Array(brightStarCount * 3);
+
+    for (let i = 0; i < brightStarCount; i++) {
+      const radius = 350;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(Math.random() * 2 - 1);
+
+      brightPositions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+      brightPositions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+      brightPositions[i * 3 + 2] = radius * Math.cos(phi);
+
+      brightColors[i * 3] = 1.0;
+      brightColors[i * 3 + 1] = 1.0;
+      brightColors[i * 3 + 2] = 1.0;
+    }
+
+    brightStarGeometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(brightPositions, 3)
+    );
+    brightStarGeometry.setAttribute(
+      "color",
+      new THREE.BufferAttribute(brightColors, 3)
+    );
+
+    const brightStarMaterial = new THREE.PointsMaterial({
+      size: 4,
+      map: starTexture,
+      transparent: true,
+      vertexColors: true,
+      blending: THREE.AdditiveBlending,
+      sizeAttenuation: true,
+    });
+
+    const brightStars = new THREE.Points(
+      brightStarGeometry,
+      brightStarMaterial
+    );
+    scene.add(brightStars);
+
+    console.log(
+      "Star field created successfully with",
+      starCount + brightStarCount,
+      "stars"
+    );
+
+    return { stars, brightStars };
+  };
+
+  useEffect(() => {
+    setIsClient(true);
   }, []);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      switch (e.key) {
-        case "ArrowLeft":
-          targetRotationRef.current.y -= 0.1;
-          setCompassRotation(-targetRotationRef.current.y * (180 / Math.PI));
-          break;
-        case "ArrowRight":
-          targetRotationRef.current.y += 0.1;
-          setCompassRotation(-targetRotationRef.current.y * (180 / Math.PI));
-          break;
-        case "ArrowUp":
-          targetRotationRef.current.x = Math.min(
-            Math.PI / 2,
-            targetRotationRef.current.x + 0.1
+    if (!containerRef.current) return;
+
+    const container = containerRef.current;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000);
+    sceneRef.current = scene;
+
+    // Camera setup
+    const camera = new THREE.PerspectiveCamera(
+      45,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
+    camera.position.set(0, 0, 5);
+    cameraRef.current = camera;
+
+    // Renderer setup
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    rendererRef.current = renderer;
+    container.appendChild(renderer.domElement);
+
+    // Create star field first
+    const starField = createStarField(scene);
+    starFieldRef.current = starField;
+
+    // Lighting - much brighter to match Google Earth appearance
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
+    directionalLight.position.set(5, 5, 5);
+    scene.add(directionalLight);
+
+    // Add additional lighting for bright Moon appearance
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    keyLight.position.set(-5, 3, 2);
+    scene.add(keyLight);
+
+    // Add fill light to eliminate dark areas
+    const fillLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    fillLight.position.set(0, -5, 0);
+    scene.add(fillLight);
+
+    // Load NASA Moon model
+    const loadMoon = async () => {
+      try {
+        const { GLTFLoader } = await import(
+          "three/examples/jsm/loaders/GLTFLoader.js"
+        );
+        const loader = new GLTFLoader();
+
+        const gltf = await new Promise<any>((resolve, reject) => {
+          loader.load(
+            "https://solarsystem.nasa.gov/rails/active_storage/blobs/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBcllRIiwiZXhwIjpudWxsLCJwdXIiOiJibG9iX2lkIn19--7d626e5badbf2157a4fa43b9e891ab22ca767f3e/Moon_1_3474.glb",
+            resolve,
+            undefined,
+            reject
           );
-          break;
-        case "ArrowDown":
-          targetRotationRef.current.x = Math.max(
-            -Math.PI / 2,
-            targetRotationRef.current.x - 0.1
+        });
+
+        if (gltf?.scene) {
+          const moonModel = gltf.scene;
+
+          // Scale and position
+          const box = new THREE.Box3().setFromObject(moonModel);
+          const size = box.getSize(new THREE.Vector3());
+          const center = box.getCenter(new THREE.Vector3());
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const scale = 2 / maxDim;
+
+          moonModel.scale.setScalar(scale);
+          moonModel.position.x = -center.x * scale;
+          moonModel.position.y = -center.y * scale;
+          moonModel.position.z = -center.z * scale;
+
+          // Enhance Moon materials for proper NASA appearance
+          moonModel.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+              if (child.material) {
+                if (Array.isArray(child.material)) {
+                  child.material.forEach((mat: any) => {
+                    if (mat.isMeshStandardMaterial || mat.isMeshPhongMaterial) {
+                      // Brighten the Moon materials
+                      mat.roughness = 0.7; // Less rough for more brightness
+                      mat.metalness = 0.0;
+                      if (mat.color) {
+                        mat.color.multiplyScalar(1.5); // Brighten the base color
+                      }
+                      mat.needsUpdate = true;
+                    }
+                  });
+                } else {
+                  const mat = child.material as any;
+                  if (mat.isMeshStandardMaterial || mat.isMeshPhongMaterial) {
+                    // Brighten the Moon materials
+                    mat.roughness = 0.7; // Less rough for more brightness
+                    mat.metalness = 0.0;
+                    if (mat.color) {
+                      mat.color.multiplyScalar(1.5); // Brighten the base color
+                    }
+                    mat.needsUpdate = true;
+                  }
+                }
+              }
+            }
+          });
+
+          scene.add(moonModel);
+          moonRef.current = moonModel;
+
+          // FIXED: Add text on the Moon surface - moved more to the left for better centering
+          const contractText = createTextOnSurface(
+            "742d35Cc6634C0532925a3b8D63C4e64c6A6E6E2",
+            new THREE.Vector3(-0.08, 0.15, 1.05), // Moved further left by 0.15
+            scene,
+            0.04
           );
-          break;
-        case "+":
-        case "=":
-          handleZoomIn();
-          break;
-        case "-":
-          handleZoomOut();
-          break;
-        case "Escape":
-          if (showMiniMap) {
-            closeMiniMap();
-          } else {
-            handleClose();
-          }
-          break;
+
+          const beachText = createTextOnSurface(
+            "Pump.fun",
+            new THREE.Vector3(-0.15, -0.05, 1.05), // Moved further left by 0.15
+            scene,
+            0.035
+          );
+
+          console.log("Moon loaded successfully!");
+          // setIsLoading(false); // Removed since we start with loading false
+        }
+      } catch (error) {
+        console.error("Failed to load Moon:", error);
+        // setIsLoading(false); // Removed since we start with loading false
       }
     };
 
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest(".context-menu")) {
-        setShowContextMenu(false);
+    // Load OrbitControls
+    const loadControls = async () => {
+      try {
+        const { OrbitControls } = await import(
+          "three/examples/jsm/controls/OrbitControls.js"
+        );
+        const controls = new OrbitControls(camera, renderer.domElement);
+
+        // Disable damping for immediate, responsive control
+        controls.enableDamping = false;
+        controls.dampingFactor = 0.05; // This won't be used since damping is disabled
+
+        controls.minDistance = 2;
+        controls.maxDistance = 10;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 1;
+
+        // Make controls more responsive
+        controls.rotateSpeed = 1.0;
+        controls.zoomSpeed = 1.2;
+        controls.panSpeed = 0.8;
+
+        // Add event listeners to track user interaction
+        controls.addEventListener("start", () => {
+          isUserInteractingRef.current = true;
+        });
+
+        controls.addEventListener("end", () => {
+          isUserInteractingRef.current = false;
+        });
+
+        controlsRef.current = controls;
+      } catch (error) {
+        console.error("Failed to load controls:", error);
       }
     };
 
-    const handleGlobalMouseMove = (e: MouseEvent) => {
-      if (isDraggingPegman) {
-        const mapElement = document.querySelector(".mini-map-container");
-        if (mapElement) {
-          const rect = mapElement.getBoundingClientRect();
-          const newX = Math.max(
-            0,
-            Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)
-          );
-          const newY = Math.max(
-            0,
-            Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)
-          );
+    loadMoon();
+    loadControls();
 
-          setPegmanPosition({ x: newX, y: newY });
+    // Animation loop
+    const animate = () => {
+      animationIdRef.current = requestAnimationFrame(animate);
 
-          const rotY = (newX / 100 - 0.5) * Math.PI * 2;
-          const rotX = (newY / 100 - 0.5) * Math.PI;
-
-          targetRotationRef.current.y = rotY;
-          targetRotationRef.current.x = Math.max(
-            -Math.PI / 2,
-            Math.min(Math.PI / 2, rotX)
-          );
-          setCompassRotation(-rotY * (180 / Math.PI));
+      // Subtle rotation for star movement
+      if (starFieldRef.current?.stars) {
+        starFieldRef.current.stars.rotation.y += 0.0001;
+        if (starFieldRef.current.brightStars) {
+          starFieldRef.current.brightStars.rotation.y += 0.00005;
+          starFieldRef.current.brightStars.rotation.x += 0.00003;
         }
       }
-    };
 
-    const handleGlobalMouseUp = () => {
-      setIsDraggingPegman(false);
-    };
+      if (controlsRef.current) {
+        // Only auto-rotate when user is not interacting
+        if (!isUserInteractingRef.current) {
+          controlsRef.current.autoRotate = true;
+        } else {
+          controlsRef.current.autoRotate = false;
+        }
 
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("click", handleClickOutside);
-    window.addEventListener("mousemove", handleGlobalMouseMove);
-    window.addEventListener("mouseup", handleGlobalMouseUp);
+        // Since damping is disabled, we don't need to call update() every frame
+        // Only call update when needed for auto-rotation
+        if (controlsRef.current.autoRotate) {
+          controlsRef.current.update();
+        }
+      }
+
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    // Handle resize
+    const handleResize = () => {
+      if (camera && renderer) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+    };
+    window.addEventListener("resize", handleResize);
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("click", handleClickOutside);
-      window.removeEventListener("mousemove", handleGlobalMouseMove);
-      window.removeEventListener("mouseup", handleGlobalMouseUp);
+      // Close share menu and search results when clicking outside
+      const handleClickOutside = (e: MouseEvent) => {
+        if (showShareMenu) {
+          setShowShareMenu(false);
+        }
+        if (showSearchResults) {
+          setShowSearchResults(false);
+        }
+      };
+      document.addEventListener("click", handleClickOutside);
+
+      window.removeEventListener("resize", handleResize);
+      if (animationIdRef.current) {
+        cancelAnimationFrame(animationIdRef.current);
+      }
+      if (controlsRef.current) {
+        controlsRef.current.dispose();
+      }
+      if (renderer && container) {
+        container.removeChild(renderer.domElement);
+        renderer.dispose();
+      }
+
+      document.removeEventListener("click", handleClickOutside);
     };
-  }, [showMiniMap, isDraggingPegman]);
+  }, []);
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-black select-none">
       <div
         ref={containerRef}
         className="absolute inset-0"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onWheel={handleWheel}
         onContextMenu={handleContextMenu}
-        style={{
-          cursor: isDragging ? "grabbing" : "grab",
+        onClick={() => {
+          if (showSearchResults) setShowSearchResults(false);
+          if (showShareMenu) setShowShareMenu(false);
         }}
+        style={{ cursor: "grab" }}
       />
+
+      {/* Professional Google Earth Minimap */}
+      <div className="absolute bottom-20 left-4 w-48 h-36 z-20">
+        {/* Minimap Container */}
+        <div
+          onClick={handleMinimapClick}
+          className="w-full h-full bg-white rounded-lg shadow-xl border border-gray-300 cursor-pointer hover:shadow-2xl transition-shadow relative overflow-hidden"
+          title="Click to navigate view"
+        >
+          {/* Header Bar */}
+          <div className="absolute top-0 left-0 right-0 h-8 bg-gray-50 border-b border-gray-200 flex items-center justify-between px-3 z-10">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-blue-500 rounded-sm"></div>
+              <span className="text-xs font-medium text-gray-700">
+                Satellite
+              </span>
+            </div>
+            <button className="w-4 h-4 flex items-center justify-center">
+              <svg
+                className="w-3 h-3 text-gray-500"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path d="M12,16A2,2 0 0,1 14,18A2,2 0 0,1 12,20A2,2 0 0,1 10,18A2,2 0 0,1 12,16M12,10A2,2 0 0,1 14,12A2,2 0 0,1 12,14A2,2 0 0,1 10,12A2,2 0 0,1 12,10M12,4A2,2 0 0,1 14,6A2,2 0 0,1 12,8A2,2 0 0,1 10,6A2,2 0 0,1 12,4Z" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Map View Area */}
+          <div className="absolute top-8 left-0 right-0 bottom-0 bg-black">
+            {/* Space Background with Stars */}
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-900">
+              {/* Fixed star positions to prevent hydration mismatch */}
+              {isClient &&
+                getFixedStarPositions().map((pos, i) => (
+                  <div
+                    key={i}
+                    className="absolute w-0.5 h-0.5 bg-white rounded-full opacity-60"
+                    style={{
+                      left: pos.left,
+                      top: pos.top,
+                    }}
+                  ></div>
+                ))}
+            </div>
+
+            {/* Moon Representation */}
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20">
+              {/* Moon Base */}
+              <div className="w-full h-full bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400 rounded-full relative shadow-inner border border-gray-400">
+                {/* Realistic Lunar Features */}
+
+                {/* Mare Tranquillitatis (Sea of Tranquility) */}
+                <div className="absolute top-3 left-4 w-6 h-4 bg-gray-600 rounded-full opacity-80"></div>
+
+                {/* Mare Imbrium (Sea of Rains) */}
+                <div className="absolute top-1 left-2 w-4 h-5 bg-gray-650 rounded-full opacity-70"></div>
+
+                {/* Tycho Crater */}
+                <div className="absolute bottom-3 left-6 w-3 h-3 bg-gray-700 rounded-full border border-gray-500 shadow-inner"></div>
+
+                {/* Copernicus Crater */}
+                <div className="absolute top-4 right-3 w-2.5 h-2.5 bg-gray-600 rounded-full border border-gray-500"></div>
+
+                {/* Small craters */}
+                <div className="absolute top-6 left-7 w-1.5 h-1.5 bg-gray-600 rounded-full opacity-60"></div>
+                <div className="absolute bottom-2 right-4 w-1 h-1 bg-gray-600 rounded-full opacity-50"></div>
+                <div className="absolute top-2 right-6 w-1 h-1 bg-gray-600 rounded-full opacity-40"></div>
+                <div className="absolute bottom-5 left-3 w-1 h-1 bg-gray-600 rounded-full opacity-45"></div>
+
+                {/* Current View Indicator */}
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                  <div className="w-6 h-6 border-2 border-blue-400 rounded-full bg-blue-400/10 animate-pulse"></div>
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-blue-400 rounded-full"></div>
+                </div>
+
+                {/* Terminator Line (Day/Night Border) */}
+                <div className="absolute top-0 right-4 bottom-0 w-px bg-gradient-to-b from-transparent via-gray-500 to-transparent opacity-30"></div>
+              </div>
+            </div>
+
+            {/* Coordinate Grid Overlay */}
+            <div className="absolute inset-0 opacity-20">
+              <svg className="w-full h-full">
+                <defs>
+                  <pattern
+                    id="miniGrid"
+                    width="12"
+                    height="12"
+                    patternUnits="userSpaceOnUse"
+                  >
+                    <path
+                      d="M 12 0 L 0 0 0 12"
+                      fill="none"
+                      stroke="#ffffff"
+                      strokeWidth="0.3"
+                    />
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#miniGrid)" />
+              </svg>
+            </div>
+
+            {/* Crosshairs */}
+            <div className="absolute top-1/2 left-0 right-0 h-px bg-blue-400/40"></div>
+            <div className="absolute left-1/2 top-0 bottom-0 w-px bg-blue-400/40"></div>
+          </div>
+
+          {/* Footer Info */}
+          <div className="absolute bottom-0 left-0 right-0 h-6 bg-gray-50 border-t border-gray-200 flex items-center justify-between px-2 text-xs text-gray-600">
+            <span>3,474 km</span>
+            <span>
+              Z:{" "}
+              {cameraRef.current
+                ? Math.round(10 - cameraRef.current.position.length())
+                : 3}
+            </span>
+          </div>
+
+          {/* Compass */}
+          <div className="absolute top-10 right-2 w-6 h-6 bg-white rounded-full shadow-md border border-gray-300 flex items-center justify-center">
+            <svg
+              className="w-3 h-3 text-red-500"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path d="M12 2l3.09 6.26L22 9l-6.91 1.74L12 22l-3.09-6.26L2 15l6.91-1.74L12 2z" />
+            </svg>
+          </div>
+
+          {/* Click Interaction Hint */}
+          <div className="absolute top-10 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
+            Click to navigate
+          </div>
+        </div>
+      </div>
+
+      {/* Right side controls - horizontal alignment at bottom right */}
+      <div className="absolute right-4 bottom-32 flex gap-2 z-20">
+        <button
+          onClick={() => {
+            // Toggle star visibility
+            if (starFieldRef.current?.stars) {
+              starFieldRef.current.stars.visible =
+                !starFieldRef.current.stars.visible;
+              if (starFieldRef.current.brightStars) {
+                starFieldRef.current.brightStars.visible =
+                  !starFieldRef.current.brightStars.visible;
+              }
+            }
+          }}
+          className="w-12 h-12 bg-gray-600/80 hover:bg-gray-500/80 rounded-full border border-gray-500 flex items-center justify-center text-white transition-colors shadow-lg cursor-pointer"
+          title="Toggle Layers"
+        >
+          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M17,7H22V17H17V19A1,1 0 0,0 18,20H20V22H17.5C16.95,22 16,21.55 16,21C16,21.55 15.05,22 14.5,22H12V20H14A1,1 0 0,0 15,19V5A1,1 0 0,0 14,4H12V2H14.5C15.05,2 16,2.45 16,3C16,2.45 16.95,2 17.5,2H20V4H18A1,1 0 0,0 17,5V7M2,7H13V9H4V15H13V17H2V7M20,9H19V15H20V9M16,9H15V15H16V9Z" />
+          </svg>
+        </button>
+        <button
+          onClick={() => {
+            // Center moon in view
+            if (moonRef.current && cameraRef.current && controlsRef.current) {
+              controlsRef.current.target.set(0, 0, 0);
+              controlsRef.current.update();
+            }
+          }}
+          className="w-12 h-12 bg-gray-600/80 hover:bg-gray-500/80 rounded-full border border-gray-500 flex items-center justify-center text-white transition-colors shadow-lg cursor-pointer"
+          title="Center View"
+        >
+          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Zoom controls - moved up to make room */}
+      <div className="absolute right-4 bottom-48 flex flex-col gap-1 z-20">
+        <button
+          onClick={() => {
+            if (cameraRef.current && controlsRef.current) {
+              const camera = cameraRef.current;
+              const newDistance = Math.max(camera.position.length() - 0.5, 2);
+              const direction = camera.position.clone().normalize();
+              camera.position.copy(direction.multiplyScalar(newDistance));
+            }
+          }}
+          className="w-10 h-10 bg-gray-600/80 hover:bg-gray-500/80 rounded-t-lg border border-gray-500 flex items-center justify-center text-white transition-colors text-xl font-bold shadow-lg cursor-pointer"
+        >
+          +
+        </button>
+        <button
+          onClick={() => {
+            if (cameraRef.current && controlsRef.current) {
+              const camera = cameraRef.current;
+              const newDistance = Math.min(camera.position.length() + 0.5, 10);
+              const direction = camera.position.clone().normalize();
+              camera.position.copy(direction.multiplyScalar(newDistance));
+            }
+          }}
+          className="w-10 h-10 bg-gray-600/80 hover:bg-gray-500/80 rounded-b-lg border border-gray-500 border-t-0 flex items-center justify-center text-white transition-colors text-xl font-bold shadow-lg cursor-pointer"
+        >
+          −
+        </button>
+      </div>
 
       {/* Context Menu */}
       {showContextMenu && (
         <div
-          className="context-menu absolute z-50 bg-white rounded-lg shadow-xl py-2 min-w-[200px]"
+          className="absolute z-50 bg-gray-900 text-white rounded-lg shadow-2xl py-2 min-w-[220px] border border-gray-700"
           style={{
             left: contextMenuPosition.x,
             top: contextMenuPosition.y,
           }}
           onClick={(e) => e.stopPropagation()}
+          onMouseLeave={() => setShowContextMenu(false)}
         >
-          <div className="px-4 py-2 text-sm text-gray-700 font-medium border-b">
-            360° View Options
+          <div className="px-4 py-2 text-sm font-medium border-b border-gray-700">
+            Moon Controls
           </div>
-
+          <button
+            onClick={handleFullscreen}
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-800"
+          >
+            Fullscreen View
+          </button>
           <button
             onClick={() => {
-              if (document.fullscreenEnabled && containerRef.current) {
-                containerRef.current.requestFullscreen().catch((err) => {
-                  console.log("Fullscreen failed:", err);
-                  alert("Fullscreen not supported or blocked");
-                });
-              } else {
-                alert("Fullscreen not supported by your browser");
-              }
+              navigator.clipboard.writeText(
+                "0x742d35Cc6634C0532925a3b8D63C4e64c6A6E6E2"
+              );
+              alert("Contract address copied!");
               setShowContextMenu(false);
             }}
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-800"
           >
-            Fullscreen
+            Copy Contract Address
           </button>
-
-          <div className="border-t my-1"></div>
-
-          <div className="px-4 py-2 text-xs text-gray-500 font-medium">
-            Change View Mode
-          </div>
-
-          {["normal", "fisheye", "stereographic", "littlePlanet"].map(
-            (mode) => (
-              <button
-                key={mode}
-                onClick={() =>
-                  handleViewModeChange(
-                    mode as
-                      | "normal"
-                      | "fisheye"
-                      | "stereographic"
-                      | "littlePlanet"
-                  )
-                }
-                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer ${
-                  viewMode === mode
-                    ? "bg-blue-50 text-blue-600"
-                    : "text-gray-700"
-                }`}
-              >
-                {mode.charAt(0).toUpperCase() +
-                  mode
-                    .slice(1)
-                    .replace(/([A-Z])/g, " $1")
-                    .trim()}{" "}
-                View
-              </button>
-            )
-          )}
         </div>
       )}
 
-      {/* Top navigation bar */}
-      <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between z-20 pointer-events-auto">
+      {/* Top Navigation - RESTORED */}
+      <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between z-30 pointer-events-auto">
         <div className="flex items-center gap-2 sm:gap-4">
-          <button
-            onClick={handleClose}
-            className="p-2 text-white hover:bg-white/20 rounded-full transition-colors cursor-pointer"
-            title="Go back"
-          >
-            <svg
-              className="w-5 h-5 sm:w-6 sm:h-6"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-            >
-              <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
-            </svg>
-          </button>
-
           <div className="relative hidden sm:block">
             <div
               className={`flex items-center bg-white rounded-full shadow-lg transition-all duration-200 ${
@@ -613,42 +848,86 @@ const GoogleStreetView360 = () => {
                 strokeWidth="2"
               >
                 <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.35-4.35L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+                <path d="m21 21-4.35-4.35" />
               </svg>
               <input
                 type="text"
-                placeholder="Search Google Maps"
+                placeholder="Search lunar features..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => setIsSearchFocused(true)}
-                onBlur={() => setIsSearchFocused(false)}
+                onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch(e)}
-                className="bg-transparent text-gray-900 placeholder-gray-500 px-4 py-3 w-48 md:w-64 lg:w-80 focus:outline-none"
+                className="bg-transparent text-gray-900 placeholder-gray-500 px-4 py-3 w-48 md:w-64 lg:w-80 focus:outline-none cursor-text"
               />
-              <div className="mr-3 p-1.5 bg-blue-500 rounded-md">
+              <button
+                onClick={() =>
+                  handleSearch({
+                    preventDefault: () => {},
+                    key: "Enter",
+                  } as any)
+                }
+                className="mr-3 p-1.5 bg-blue-500 hover:bg-blue-600 rounded-md transition-colors cursor-pointer"
+              >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
                   <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z" />
                 </svg>
-              </div>
+              </button>
             </div>
+
+            {/* Search Results Dropdown - Higher z-index */}
+            {showSearchResults && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 max-h-60 overflow-y-auto z-50">
+                <div className="flex items-center justify-between p-3 border-b border-gray-200">
+                  <span className="text-sm font-medium text-gray-700">
+                    Search Results
+                  </span>
+                  <button
+                    onClick={() => setShowSearchResults(false)}
+                    className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+                  >
+                    <svg
+                      className="w-4 h-4 text-gray-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
+                {searchResults.map((result, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleSearchResultClick(result)}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-100 border-b border-gray-100 last:border-b-0 text-gray-800 cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <svg
+                        className="w-4 h-4 text-gray-500"
+                        fill="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M12,6.5A2.5,2.5 0 0,1 14.5,9A2.5,2.5 0 0,1 12,11.5A2.5,2.5 0 0,1 9.5,9A2.5,2.5 0 0,1 12,6.5M12,2A7,7 0 0,1 19,9C19,14.25 12,22 12,22C12,22 5,14.25 5,9A7,7 0 0,1 12,2M12,4A5,5 0 0,0 7,9C7,10 7,12 12,18.71C17,12 17,10 17,9A5,5 0 0,0 12,4Z" />
+                      </svg>
+                      {result}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
           <button
-            onClick={() => {
-              if (navigator.share) {
-                navigator.share({
-                  title: "360° Lofoten Beach - Contract Address",
-                  text: "Check out this 360° beach view with contract address!",
-                  url: window.location.href,
-                });
-              } else {
-                navigator.clipboard.writeText(window.location.href);
-                alert("Link copied to clipboard!");
-              }
-            }}
-            className="flex items-center gap-2 bg-gray-700/80 hover:bg-gray-700 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-full transition-colors backdrop-blur-sm cursor-pointer"
+            onClick={() => setShowShareMenu(!showShareMenu)}
+            className="relative flex items-center gap-2 bg-gray-700/80 hover:bg-gray-600/80 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-full transition-all duration-200 backdrop-blur-sm border border-gray-600 shadow-lg cursor-pointer"
           >
             <svg
               className="w-4 h-4"
@@ -664,358 +943,166 @@ const GoogleStreetView360 = () => {
             <span className="text-sm font-medium hidden sm:inline">Share</span>
           </button>
 
-          <button
-            onClick={handleClose}
-            className="p-2 sm:p-2.5 text-white hover:bg-white/20 rounded-full transition-colors cursor-pointer"
-            title="Close Street View"
-          >
-            <svg
-              className="w-5 h-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-      </div>
+          {/* Enhanced Share Menu */}
+          {showShareMenu && (
+            <div className="absolute top-16 right-0 bg-gray-900/95 backdrop-blur-md rounded-lg shadow-2xl border border-gray-700 min-w-[280px] z-50 animate-in slide-in-from-top-2 duration-200">
+              <div className="p-4">
+                <div className="text-white font-medium mb-3 flex items-center gap-2">
+                  <svg
+                    className="w-5 h-5 text-blue-400"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z" />
+                  </svg>
+                  Share Moon View
+                </div>
 
-      {/* Location info overlay */}
-      <div className="absolute top-20 left-4 z-20 pointer-events-none">
-        <div className="bg-gray-900/90 text-white px-4 py-2 rounded-lg backdrop-blur-sm">
-          <div className="text-base sm:text-lg font-medium">
-            360° Lofoten Beach
-          </div>
-          <div className="text-xs sm:text-sm text-gray-300">
-            Turquoise Waves • Arctic Norway •{" "}
-            {viewMode.charAt(0).toUpperCase() +
-              viewMode
-                .slice(1)
-                .replace(/([A-Z])/g, " $1")
-                .trim()}{" "}
-            View
-          </div>
-        </div>
-      </div>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.href);
+                      alert("Link copied to clipboard!");
+                      setShowShareMenu(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-left text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors"
+                  >
+                    <svg
+                      className="w-5 h-5 text-blue-400"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" />
+                    </svg>
+                    <span>Copy Link</span>
+                  </button>
 
-      {/* Right side controls container */}
-      <div className="absolute right-4 bottom-20 z-20 flex flex-col items-center gap-3 pointer-events-auto">
-        <button
-          onClick={() => {
-            targetRotationRef.current = { x: 0, y: 0 };
-            rotationRef.current = { x: 0, y: 0 };
-            setCompassRotation(0);
-            setZoom(1);
-          }}
-          className="group relative w-12 h-12 bg-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
-          title="Reset view to center"
-        >
-          <div className="absolute inset-0 rounded-full overflow-hidden">
-            <div className="absolute inset-0 rounded-full bg-gradient-to-b from-gray-50 to-white"></div>
-            <div
-              className="absolute inset-1 rounded-full bg-white flex items-center justify-center"
-              style={{
-                transform: `rotate(${compassRotation}deg)`,
-                transition:
-                  isDragging || touchStart ? "none" : "transform 0.3s ease",
-              }}
-            >
-              <div className="relative w-full h-full">
-                <div
-                  className="absolute top-0 left-1/2 transform -translate-x-1/2 w-0 h-0"
-                  style={{
-                    borderLeft: "4px solid transparent",
-                    borderRight: "4px solid transparent",
-                    borderBottom: "16px solid #EA4335",
-                    marginTop: "3px",
-                  }}
-                ></div>
-                <div
-                  className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-0 h-0"
-                  style={{
-                    borderLeft: "4px solid transparent",
-                    borderRight: "4px solid transparent",
-                    borderTop: "16px solid #5F6368",
-                    marginBottom: "3px",
-                  }}
-                ></div>
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-gray-700 rounded-full"></div>
-              </div>
-            </div>
-          </div>
-        </button>
+                  <button
+                    onClick={() => {
+                      if (navigator.share) {
+                        navigator.share({
+                          title: "Google Earth - Moon",
+                          text: "Experience the Moon in stunning detail with Google Earth!",
+                          url: window.location.href,
+                        });
+                      } else {
+                        alert("Native sharing not supported on this device");
+                      }
+                      setShowShareMenu(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-left text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors"
+                  >
+                    <svg
+                      className="w-5 h-5 text-green-400"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M21 6h-2l-1.27-1.27A2.49 2.49 0 0 0 16 4h-2.5A2.49 2.49 0 0 0 11.73 4.73L10.46 6H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM7 17c-1.38 0-2.5-1.12-2.5-2.5S5.62 12 7 12s2.5 1.12 2.5 2.5S8.38 17 7 17zm5-6.5c-2.48 0-4.5 2.02-4.5 4.5s2.02 4.5 4.5 4.5 4.5-2.02 4.5-4.5-2.02-4.5-4.5-4.5z" />
+                    </svg>
+                    <span>Share via Device</span>
+                  </button>
 
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-          <button
-            onClick={handleZoomIn}
-            className="block p-2.5 sm:p-3 text-gray-700 hover:bg-gray-100 transition-colors border-b border-gray-200 cursor-pointer"
-            title="Zoom in (+)"
-          >
-            <svg
-              className="w-4 h-4 sm:w-[18px] sm:h-[18px]"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-          </button>
-          <button
-            onClick={handleZoomOut}
-            className="block p-2.5 sm:p-3 text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
-            title="Zoom out (-)"
-          >
-            <svg
-              className="w-4 h-4 sm:w-[18px] sm:h-[18px]"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-          </button>
-        </div>
-      </div>
+                  <button
+                    onClick={() => {
+                      const twitterText = encodeURIComponent(
+                        "Check out this amazing 3D Moon model on Google Earth! 🌙"
+                      );
+                      const twitterUrl = `https://twitter.com/intent/tweet?text=${twitterText}&url=${encodeURIComponent(
+                        window.location.href
+                      )}`;
+                      window.open(twitterUrl, "_blank");
+                      setShowShareMenu(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-left text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors"
+                  >
+                    <svg
+                      className="w-5 h-5 text-blue-400"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z" />
+                    </svg>
+                    <span>Share on Twitter</span>
+                  </button>
 
-      {/* GOOGLE MAPS STYLE Mini Map */}
-      <div
-        className={`mini-map-container absolute bottom-4 left-4 bg-white rounded-lg shadow-xl overflow-hidden z-20 border-2 border-gray-300 transition-all duration-300 cursor-pointer ${
-          isMapHovered ? "w-80 h-60" : "w-24 h-20 sm:w-32 sm:h-24"
-        }`}
-        onMouseEnter={() => setIsMapHovered(true)}
-        onMouseLeave={() => setIsMapHovered(false)}
-        onClick={handleMiniMapClick}
-      >
-        {isMapHovered ? (
-          <div className="relative w-full h-full">
-            {/* Clean Google Maps Style Background */}
-            <div
-              className="absolute inset-0"
-              style={{
-                transform: `scale(${mapZoom})`,
-                transformOrigin: "center",
-              }}
-            >
-              {/* Ocean - clean blue */}
-              <div className="w-full h-[50%] bg-blue-500"></div>
-
-              {/* Beach - clean tan/beige */}
-              <div className="w-full h-[25%] bg-yellow-200"></div>
-
-              {/* Land/Grass - clean green */}
-              <div className="w-full h-[25%] bg-green-400"></div>
-
-              {/* Simple coastline */}
-              <div className="absolute top-[50%] left-0 right-0 h-px bg-white opacity-60"></div>
-              <div className="absolute top-[75%] left-0 right-0 h-px bg-gray-300 opacity-40"></div>
-
-              {/* Street View Coverage - Blue lines like Google Maps */}
-              <div className="absolute inset-0 z-10">
-                {/* Main road with Street View */}
-                <div className="absolute top-[85%] left-0 right-0 h-1.5 bg-blue-600 opacity-90"></div>
-
-                {/* Beach access points */}
-                <div className="absolute top-[75%] left-[25%] w-1.5 h-[10%] bg-blue-600 opacity-80"></div>
-                <div className="absolute top-[75%] left-[50%] w-1.5 h-[10%] bg-blue-600 opacity-80"></div>
-                <div className="absolute top-[75%] left-[75%] w-1.5 h-[10%] bg-blue-600 opacity-80"></div>
-
-                {/* Viewpoint coverage along beach */}
-                <div className="absolute top-[70%] left-[20%] w-[15%] h-1.5 bg-blue-600 opacity-75"></div>
-                <div className="absolute top-[70%] left-[42%] w-[16%] h-1.5 bg-blue-600 opacity-75"></div>
-                <div className="absolute top-[70%] left-[65%] w-[15%] h-1.5 bg-blue-600 opacity-75"></div>
-              </div>
-
-              {/* Camera position - Google style red dot */}
-              <div
-                className="absolute w-4 h-4 transform -translate-x-1/2 -translate-y-1/2 z-20"
-                style={{ top: "70%", left: "50%" }}
-              >
-                <div className="absolute inset-0 bg-red-500 rounded-full border-2 border-white shadow-lg"></div>
-              </div>
-
-              {/* Pegman - Google style yellow figure */}
-              <div
-                className="absolute w-5 h-5 transform -translate-x-1/2 -translate-y-1/2 z-30 cursor-grab hover:cursor-grabbing"
-                style={{
-                  left: `${pegmanPosition.x}%`,
-                  top: `${pegmanPosition.y}%`,
-                  cursor: isDraggingPegman ? "grabbing" : "grab",
-                }}
-                onMouseDown={handlePegmanMouseDown}
-                title="Drag to explore"
-              >
-                <div
-                  className={`${
-                    isDraggingPegman ? "scale-110" : ""
-                  } transition-transform`}
-                >
-                  {/* Google Pegman style */}
-                  <div className="w-4 h-4 bg-yellow-400 rounded-full border-2 border-white shadow-md flex items-center justify-center">
-                    <div className="w-1.5 h-1.5 bg-orange-500 rounded-full"></div>
+                  <div className="pt-2 border-t border-gray-700">
+                    <div className="text-xs text-gray-500 mb-2">
+                      Quick Actions
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          "742d35Cc6634C0532925a3b8D63C4e64c6A6E6E2"
+                        );
+                        alert("Contract address copied!");
+                        setShowShareMenu(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2 text-left text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors"
+                    >
+                      <svg
+                        className="w-5 h-5 text-yellow-400"
+                        fill="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z" />
+                      </svg>
+                      <span>Copy Contract Address</span>
+                    </button>
                   </div>
                 </div>
               </div>
             </div>
-
-            {/* Zoom Controls - Google Maps style */}
-            <div className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-white rounded shadow-lg overflow-hidden z-40">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleMapZoomIn();
-                }}
-                className="block p-2 text-gray-700 hover:bg-gray-100 transition-colors border-b border-gray-200"
-                title="Zoom in"
-              >
-                <svg
-                  className="w-4 h-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleMapZoomOut();
-                }}
-                className="block p-2 text-gray-700 hover:bg-gray-100 transition-colors"
-                title="Zoom out"
-              >
-                <svg
-                  className="w-4 h-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Location label - Google Maps style */}
-            <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded z-30">
-              Lofoten Beach, Norway
-            </div>
-
-            {/* Compass - Simple Google style */}
-            <div className="absolute top-2 right-2 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-md z-30">
-              <div
-                className="text-red-500 font-bold text-xs"
-                style={{
-                  transform: `rotate(${compassRotation}deg)`,
-                  transition:
-                    isDragging || touchStart ? "none" : "transform 0.3s ease",
-                }}
-              >
-                N
-              </div>
-            </div>
-
-            {/* Satellite label */}
-            <div className="absolute bottom-2 right-2 text-xs text-white bg-black bg-opacity-50 px-1 rounded z-30">
-              Satellite
-            </div>
-          </div>
-        ) : (
-          /* Collapsed mini map - Clean Google style */
-          <div className="w-full h-full relative cursor-pointer overflow-hidden">
-            {/* Simple collapsed view */}
-            <div className="absolute inset-0">
-              <div className="w-full h-[50%] bg-blue-500"></div>
-              <div className="w-full h-[25%] bg-yellow-200"></div>
-              <div className="w-full h-[25%] bg-green-400"></div>
-
-              {/* Street View lines in collapsed state */}
-              <div className="absolute top-[85%] left-0 right-0 h-0.5 bg-blue-600 opacity-80"></div>
-              <div className="absolute top-[70%] left-[25%] w-0.5 h-[15%] bg-blue-600 opacity-70"></div>
-              <div className="absolute top-[70%] left-[50%] w-0.5 h-[15%] bg-blue-600 opacity-70"></div>
-              <div className="absolute top-[70%] left-[75%] w-0.5 h-[15%] bg-blue-600 opacity-70"></div>
-            </div>
-
-            <div className="absolute top-[70%] left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-              <div className="w-2 h-2 bg-red-500 rounded-full border border-white shadow-sm"></div>
-            </div>
-
-            <div className="absolute bottom-0.5 right-0.5 text-xs opacity-70">
-              🗺️
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Google logo */}
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none">
-        <div className="text-lg sm:text-2xl font-normal tracking-tight drop-shadow-lg">
-          <span className="text-blue-400">G</span>
-          <span className="text-red-400">o</span>
-          <span className="text-yellow-400">o</span>
-          <span className="text-blue-400">g</span>
-          <span className="text-green-400">l</span>
-          <span className="text-red-400">e</span>
+          )}
         </div>
       </div>
 
-      {/* Bottom right info */}
-      <div className="absolute bottom-2 right-4 text-[10px] sm:text-xs text-black/80 z-20 space-x-1 hidden sm:block pointer-events-none">
-        <span>360° Video Experience</span>
-        <span>•</span>
-        <span>Drag to explore</span>
-        <span>•</span>
-        <span>Hover map to expand</span>
-        <span>•</span>
-        <span>Drag Pegman around</span>
+      {/* Info Overlay - Changed from NASA to Google branding */}
+      <div className="absolute top-20 left-4 z-20 pointer-events-none">
+        <div className="bg-gray-900/95 text-white px-4 py-3 rounded-lg backdrop-blur-sm border border-gray-700">
+          <div className="text-base sm:text-lg font-bold text-blue-400">
+            Google Earth - Moon
+          </div>
+          <div className="text-xs sm:text-sm text-gray-300 space-y-1">
+            <div>Satellite Imagery</div>
+            <div>High-Resolution Lunar Surface</div>
+            <div>3D Interactive Model</div>
+          </div>
+        </div>
       </div>
 
-      {/* CSS Animations */}
-      <style jsx>{`
-        .pulse-ring {
-          box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-          animation: pulse-ring 2s infinite;
-        }
+      {/* Bottom status bar - Google Earth style */}
+      <div className="absolute bottom-0 left-0 right-0 h-16 bg-gray-900/95 border-t border-gray-700 flex items-center justify-between px-4 z-20">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 2L13.09 8.26L20 9L13.09 15.74L12 22L10.91 15.74L4 9L10.91 8.26L12 2Z"
+                fill="#4F85F4"
+              />
+            </svg>
+            <span className="text-white font-medium">Google</span>
+          </div>
+          <div className="text-gray-300 text-sm">100%</div>
+          <button
+            onClick={() =>
+              alert(
+                "Imagery ©2024 NASA/JPL-Caltech, Data providers: NASA, USGS"
+              )
+            }
+            className="text-gray-300 hover:text-white text-sm underline cursor-pointer"
+          >
+            Data attribution
+          </button>
+        </div>
 
-        @keyframes pulse-ring {
-          0% {
-            transform: scale(0.95);
-            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-          }
-          70% {
-            transform: scale(1);
-            box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
-          }
-          100% {
-            transform: scale(0.95);
-            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-          }
-        }
-
-        .pegman-body {
-          animation: pegman-idle 3s ease-in-out infinite;
-        }
-
-        @keyframes pegman-idle {
-          0%,
-          100% {
-            transform: translateY(0px) scale(1);
-          }
-          50% {
-            transform: translateY(-2px) scale(1.05);
-          }
-        }
-      `}</style>
+        <div className="flex items-center gap-6">
+          <div className="text-gray-300 text-sm">3,474 km</div>
+          <div className="text-gray-300 text-sm">Camera: 384,400 km</div>
+          <div className="text-gray-300 text-sm">0°00'00"N 0°00'00"E</div>
+        </div>
+      </div>
     </div>
   );
 };
 
-export default GoogleStreetView360;
+export default MoonViewer;
