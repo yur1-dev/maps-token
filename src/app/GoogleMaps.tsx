@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 const GoogleMaps = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -21,7 +22,7 @@ const GoogleMaps = () => {
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const moonRef = useRef<THREE.Group | null>(null);
   const animationIdRef = useRef<number | null>(null);
-  const controlsRef = useRef<THREE.OrbitControls | null>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
   const isUserInteractingRef = useRef(false);
   const starFieldRef = useRef<{
     stars: THREE.Points;
@@ -465,11 +466,8 @@ const GoogleMaps = () => {
     };
 
     // Load OrbitControls
-    const loadControls = async () => {
+    const loadControls = () => {
       try {
-        const { OrbitControls } = await import(
-          "three/examples/jsm/controls/OrbitControls.js"
-        );
         const controls = new OrbitControls(camera, renderer.domElement);
 
         // Disable damping for immediate, responsive control
