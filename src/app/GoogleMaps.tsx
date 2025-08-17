@@ -381,8 +381,8 @@ const MoonViewer = () => {
           );
         });
 
-        if (gltf?.scene) {
-          const moonModel = gltf.scene;
+        if (gltf && typeof gltf === "object" && "scene" in gltf) {
+          const moonModel = (gltf as any).scene;
 
           // Scale and position
           const box = new THREE.Box3().setFromObject(moonModel);
@@ -397,7 +397,7 @@ const MoonViewer = () => {
           moonModel.position.z = -center.z * scale;
 
           // Enhance Moon materials for proper NASA appearance
-          moonModel.traverse((child) => {
+          moonModel.traverse((child: THREE.Object3D) => {
             if (child instanceof THREE.Mesh) {
               if (child.material) {
                 if (Array.isArray(child.material)) {
@@ -442,17 +442,17 @@ const MoonViewer = () => {
           scene.add(moonModel);
           moonRef.current = moonModel;
 
-          // FIXED: Add text on the Moon surface - moved more to the left for better centering
-          const contractText = createTextOnSurface(
+          // Add text on the Moon surface - moved more to the left for better centering
+          createTextOnSurface(
             "742d35Cc6634C0532925a3b8D63C4e64c6A6E6E2",
-            new THREE.Vector3(-0.15, 0.15, 1.05), // Moved further left by 0.15
+            new THREE.Vector3(-0.12, 0.15, 1.05),
             scene,
             0.04
           );
 
-          const beachText = createTextOnSurface(
+          createTextOnSurface(
             "Pump.fun",
-            new THREE.Vector3(-0.15, -0.05, 1.05), // Moved further left by 0.15
+            new THREE.Vector3(-0.15, -0.05, 1.05),
             scene,
             0.035
           );
@@ -1071,7 +1071,9 @@ const MoonViewer = () => {
         <div className="flex items-center gap-6">
           <div className="text-gray-300 text-sm">3,474 km</div>
           <div className="text-gray-300 text-sm">Camera: 384,400 km</div>
-          <div className="text-gray-300 text-sm">0°00'00"N 0°00'00"E</div>
+          <div className="text-gray-300 text-sm">
+            0°00'00&quot;N 0°00'00&quot;E
+          </div>
         </div>
       </div>
     </div>
