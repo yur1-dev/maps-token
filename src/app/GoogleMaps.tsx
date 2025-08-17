@@ -365,7 +365,166 @@ const GoogleMaps = () => {
     fillLight.position.set(0, -5, 0);
     scene.add(fillLight);
 
-    // Load NASA Moon model
+    // Create a procedural moon with realistic texture
+    const createProceduralMoon = () => {
+      try {
+        // Create moon geometry
+        const moonGeometry = new THREE.SphereGeometry(1, 64, 32);
+
+        // Create realistic moon texture using canvas
+        const canvas = document.createElement("canvas");
+        canvas.width = 1024;
+        canvas.height = 512;
+        const ctx = canvas.getContext("2d")!;
+
+        // Base moon color
+        const gradient = ctx.createLinearGradient(
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+        gradient.addColorStop(0, "#8a8a8a");
+        gradient.addColorStop(0.5, "#b8b8b8");
+        gradient.addColorStop(1, "#9a9a9a");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Add realistic lunar features
+        const features = [
+          { x: 200, y: 150, size: 80, darkness: 0.4 }, // Mare Tranquillitatis
+          { x: 400, y: 100, size: 60, darkness: 0.3 }, // Mare Imbrium
+          { x: 600, y: 200, size: 40, darkness: 0.5 }, // Mare Serenitatis
+          { x: 150, y: 300, size: 50, darkness: 0.4 }, // Mare Crisium
+          { x: 800, y: 250, size: 30, darkness: 0.6 }, // Tycho Crater
+          { x: 500, y: 350, size: 25, darkness: 0.5 }, // Copernicus Crater
+        ];
+
+        features.forEach((feature) => {
+          const featureGradient = ctx.createRadialGradient(
+            feature.x,
+            feature.y,
+            0,
+            feature.x,
+            feature.y,
+            feature.size
+          );
+          featureGradient.addColorStop(0, `rgba(0, 0, 0, ${feature.darkness})`);
+          featureGradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+          ctx.fillStyle = featureGradient;
+          ctx.fillRect(
+            feature.x - feature.size,
+            feature.y - feature.size,
+            feature.size * 2,
+            feature.size * 2
+          );
+        });
+
+        // Add smaller craters
+        for (let i = 0; i < 50; i++) {
+          const x = Math.random() * canvas.width;
+          const y = Math.random() * canvas.height;
+          const size = Math.random() * 15 + 3;
+          const darkness = Math.random() * 0.3 + 0.2;
+
+          const craterGradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+          craterGradient.addColorStop(0, `rgba(0, 0, 0, ${darkness})`);
+          craterGradient.addColorStop(0.7, `rgba(0, 0, 0, ${darkness * 0.5})`);
+          craterGradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+          ctx.fillStyle = craterGradient;
+          ctx.fillRect(x - size, y - size, size * 2, size * 2);
+        }
+
+        // Create texture from canvas
+        const moonTexture = new THREE.CanvasTexture(canvas);
+        moonTexture.needsUpdate = true;
+
+        // Create normal map for surface detail
+        const normalCanvas = document.createElement("canvas");
+        normalCanvas.width = 512;
+        normalCanvas.height = 256;
+        const normalCtx = normalCanvas.getContext("2d")!;
+
+        // Base normal map color (neutral)
+        normalCtx.fillStyle = "#8080ff";
+        normalCtx.fillRect(0, 0, normalCanvas.width, normalCanvas.height);
+
+        // Add surface variations
+        for (let i = 0; i < 100; i++) {
+          const x = Math.random() * normalCanvas.width;
+          const y = Math.random() * normalCanvas.height;
+          const size = Math.random() * 20 + 5;
+
+          const normalGradient = normalCtx.createRadialGradient(
+            x,
+            y,
+            0,
+            x,
+            y,
+            size
+          );
+          normalGradient.addColorStop(0, "#6060ff");
+          normalGradient.addColorStop(1, "#8080ff");
+          normalCtx.fillStyle = normalGradient;
+          normalCtx.fillRect(x - size, y - size, size * 2, size * 2);
+        }
+
+        const normalTexture = new THREE.CanvasTexture(normalCanvas);
+        normalTexture.needsUpdate = true;
+
+        // Create moon material
+        const moonMaterial = new THREE.MeshStandardMaterial({
+          map: moonTexture,
+          normalMap: normalTexture,
+          roughness: 0.8,
+          metalness: 0.0,
+          color: new THREE.Color(0xffffff),
+        });
+
+        // Create moon mesh
+        const moonMesh = new THREE.Mesh(moonGeometry, moonMaterial);
+        const moonGroup = new THREE.Group();
+        moonGroup.add(moonMesh);
+
+        scene.add(moonGroup);
+        moonRef.current = moonGroup;
+
+        // Add text on the Moon surface
+        createTextOnSurface(
+          "742d35Cc6634C0532925a3b8D63C4e64c6A6E6E2",
+          new THREE.Vector3(-0.12, 0.15, 1.05),
+          scene,
+          0.04
+        );
+
+        createTextOnSurface(
+          "Pump.fun",
+          new THREE.Vector3(-0.15, -0.05, 1.05),
+          scene,
+          0.035
+        );
+
+        console.log("Procedural Moon created successfully!");
+      } catch (error) {
+        console.error("Failed to create procedural moon:", error);
+
+        // Ultimate fallback - simple sphere
+        const fallbackGeometry = new THREE.SphereGeometry(1, 32, 16);
+        const fallbackMaterial = new THREE.MeshStandardMaterial({
+          color: 0xaaaaaa,
+          roughness: 0.8,
+          metalness: 0.0,
+        });
+        const fallbackMesh = new THREE.Mesh(fallbackGeometry, fallbackMaterial);
+        const fallbackGroup = new THREE.Group();
+        fallbackGroup.add(fallbackMesh);
+        scene.add(fallbackGroup);
+        moonRef.current = fallbackGroup;
+        console.log("Fallback moon created");
+      }
+    };
+
+    // Load NASA Moon model with fallback
     const loadMoon = async () => {
       try {
         const { GLTFLoader } = await import(
@@ -373,7 +532,12 @@ const GoogleMaps = () => {
         );
         const loader = new GLTFLoader();
 
-        const gltf = await new Promise<unknown>((resolve, reject) => {
+        // Set a timeout for the model loading
+        const modelLoadTimeout = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error("Model load timeout")), 10000);
+        });
+
+        const modelLoad = new Promise<unknown>((resolve, reject) => {
           loader.load(
             "https://solarsystem.nasa.gov/rails/active_storage/blobs/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBcllRIiwiZXhwIjpudWxsLCJwdXIiOiJibG9iX2lkIn19--7d626e5badbf2157a4fa43b9e891ab22ca767f3e/Moon_1_3474.glb",
             resolve,
@@ -381,6 +545,8 @@ const GoogleMaps = () => {
             reject
           );
         });
+
+        const gltf = await Promise.race([modelLoad, modelLoadTimeout]);
 
         if (gltf && typeof gltf === "object" && "scene" in gltf) {
           const moonModel = (gltf as { scene: THREE.Group }).scene;
@@ -458,10 +624,15 @@ const GoogleMaps = () => {
             0.035
           );
 
-          console.log("Moon loaded successfully!");
+          console.log("NASA Moon model loaded successfully!");
         }
       } catch (error) {
-        console.error("Failed to load Moon:", error);
+        console.error(
+          "Failed to load NASA Moon model, using procedural moon:",
+          error
+        );
+        // Use procedural moon as fallback
+        createProceduralMoon();
       }
     };
 
