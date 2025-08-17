@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
-const MoonViewer = () => {
+const GoogleMaps = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -382,7 +382,7 @@ const MoonViewer = () => {
         });
 
         if (gltf && typeof gltf === "object" && "scene" in gltf) {
-          const moonModel = (gltf as any).scene;
+          const moonModel = (gltf as { scene: THREE.Group }).scene;
 
           // Scale and position
           const box = new THREE.Box3().setFromObject(moonModel);
@@ -1072,7 +1072,7 @@ const MoonViewer = () => {
           <div className="text-gray-300 text-sm">3,474 km</div>
           <div className="text-gray-300 text-sm">Camera: 384,400 km</div>
           <div className="text-gray-300 text-sm">
-            0°00'00&quot;N 0°00'00&quot;E
+            0°00&apos;00&quot;N 0°00&apos;00&quot;E
           </div>
         </div>
       </div>
@@ -1080,4 +1080,4 @@ const MoonViewer = () => {
   );
 };
 
-export default MoonViewer;
+export default GoogleMaps;
