@@ -492,7 +492,7 @@ const GoogleMaps = () => {
         // Add text on the Moon surface
         createTextOnSurface(
           "742d35Cc6634C0532925a3b8D63C4e64c6A6E6E2",
-          new THREE.Vector3(-0.12, 0.15, 1.05),
+          new THREE.Vector3(-0.09, 0.15, 1.05),
           scene,
           0.04
         );
