@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 const GoogleMaps = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -21,7 +22,7 @@ const GoogleMaps = () => {
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const moonRef = useRef<THREE.Group | null>(null);
   const animationIdRef = useRef<number | null>(null);
-  const controlsRef = useRef<any>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
   const isUserInteractingRef = useRef(false);
   const starFieldRef = useRef<{
     stars: THREE.Points;
@@ -314,10 +315,10 @@ const GoogleMaps = () => {
   };
 
   // Enhanced procedural moon creation - now the primary method
-  const createProceduralMoon = () => {
+  const createProceduralMoon = useCallback(() => {
     try {
       console.log("Creating procedural Moon...");
-
+      
       // Create moon geometry with higher detail
       const moonGeometry = new THREE.SphereGeometry(1, 128, 64);
 
@@ -329,12 +330,8 @@ const GoogleMaps = () => {
 
       // Base moon color with realistic gradients
       const gradient = ctx.createRadialGradient(
-        canvas.width * 0.3,
-        canvas.height * 0.3,
-        0,
-        canvas.width * 0.5,
-        canvas.height * 0.5,
-        canvas.width * 0.7
+        canvas.width * 0.3, canvas.height * 0.3, 0,
+        canvas.width * 0.5, canvas.height * 0.5, canvas.width * 0.7
       );
       gradient.addColorStop(0, "#c4c4c4");
       gradient.addColorStop(0.3, "#b8b8b8");
@@ -345,66 +342,24 @@ const GoogleMaps = () => {
 
       // Add realistic lunar maria (dark areas)
       const maria = [
-        {
-          x: 400,
-          y: 300,
-          w: 200,
-          h: 160,
-          darkness: 0.4,
-          name: "Mare Tranquillitatis",
-        },
-        {
-          x: 800,
-          y: 200,
-          w: 180,
-          h: 140,
-          darkness: 0.35,
-          name: "Mare Imbrium",
-        },
-        {
-          x: 1200,
-          y: 400,
-          w: 120,
-          h: 100,
-          darkness: 0.45,
-          name: "Mare Serenitatis",
-        },
+        { x: 400, y: 300, w: 200, h: 160, darkness: 0.4, name: "Mare Tranquillitatis" },
+        { x: 800, y: 200, w: 180, h: 140, darkness: 0.35, name: "Mare Imbrium" },
+        { x: 1200, y: 400, w: 120, h: 100, darkness: 0.45, name: "Mare Serenitatis" },
         { x: 300, y: 600, w: 140, h: 120, darkness: 0.4, name: "Mare Crisium" },
-        {
-          x: 1400,
-          y: 300,
-          w: 160,
-          h: 140,
-          darkness: 0.3,
-          name: "Oceanus Procellarum",
-        },
-        {
-          x: 600,
-          y: 100,
-          w: 100,
-          h: 80,
-          darkness: 0.35,
-          name: "Mare Serenitatis",
-        },
+        { x: 1400, y: 300, w: 160, h: 140, darkness: 0.3, name: "Oceanus Procellarum" },
+        { x: 600, y: 100, w: 100, h: 80, darkness: 0.35, name: "Mare Serenitatis" },
       ];
 
       maria.forEach((mare) => {
         const mariaGradient = ctx.createRadialGradient(
-          mare.x,
-          mare.y,
-          0,
-          mare.x,
-          mare.y,
-          Math.max(mare.w, mare.h)
+          mare.x, mare.y, 0,
+          mare.x, mare.y, Math.max(mare.w, mare.h)
         );
         mariaGradient.addColorStop(0, `rgba(0, 0, 0, ${mare.darkness})`);
-        mariaGradient.addColorStop(
-          0.7,
-          `rgba(0, 0, 0, ${mare.darkness * 0.7})`
-        );
+        mariaGradient.addColorStop(0.7, `rgba(0, 0, 0, ${mare.darkness * 0.7})`);
         mariaGradient.addColorStop(1, "rgba(0, 0, 0, 0)");
         ctx.fillStyle = mariaGradient;
-        ctx.ellipse(mare.x, mare.y, mare.w / 2, mare.h / 2, 0, 0, Math.PI * 2);
+        ctx.ellipse(mare.x, mare.y, mare.w/2, mare.h/2, 0, 0, Math.PI * 2);
         ctx.fill();
       });
 
@@ -420,22 +375,12 @@ const GoogleMaps = () => {
       majorCraters.forEach((crater) => {
         // Main crater
         const craterGradient = ctx.createRadialGradient(
-          crater.x,
-          crater.y,
-          0,
-          crater.x,
-          crater.y,
-          crater.size
+          crater.x, crater.y, 0,
+          crater.x, crater.y, crater.size
         );
         craterGradient.addColorStop(0, `rgba(0, 0, 0, ${crater.darkness})`);
-        craterGradient.addColorStop(
-          0.6,
-          `rgba(0, 0, 0, ${crater.darkness * 0.8})`
-        );
-        craterGradient.addColorStop(
-          0.9,
-          `rgba(0, 0, 0, ${crater.darkness * 0.3})`
-        );
+        craterGradient.addColorStop(0.6, `rgba(0, 0, 0, ${crater.darkness * 0.8})`);
+        craterGradient.addColorStop(0.9, `rgba(0, 0, 0, ${crater.darkness * 0.3})`);
         craterGradient.addColorStop(1, "rgba(0, 0, 0, 0)");
         ctx.fillStyle = craterGradient;
         ctx.beginPath();
@@ -444,12 +389,8 @@ const GoogleMaps = () => {
 
         // Crater rim highlight
         const rimGradient = ctx.createRadialGradient(
-          crater.x,
-          crater.y,
-          crater.size * 0.8,
-          crater.x,
-          crater.y,
-          crater.size * 1.2
+          crater.x, crater.y, crater.size * 0.8,
+          crater.x, crater.y, crater.size * 1.2
         );
         rimGradient.addColorStop(0, "rgba(255, 255, 255, 0)");
         rimGradient.addColorStop(0.5, "rgba(255, 255, 255, 0.1)");
@@ -512,12 +453,7 @@ const GoogleMaps = () => {
         const intensity = Math.random() * 0.3 + 0.1;
 
         const normalGradient = normalCtx.createRadialGradient(
-          x,
-          y,
-          0,
-          x,
-          y,
-          size
+          x, y, 0, x, y, size
         );
         normalGradient.addColorStop(0, `rgba(96, 96, 255, ${intensity})`);
         normalGradient.addColorStop(1, "rgba(128, 128, 255, 0)");
@@ -626,10 +562,8 @@ const GoogleMaps = () => {
     const loadControls = async () => {
       try {
         // Use dynamic import to avoid SSR issues
-        const { OrbitControls } = await import(
-          "three/examples/jsm/controls/OrbitControls.js"
-        );
-
+        const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js');
+        
         const controls = new OrbitControls(camera, renderer.domElement);
 
         // Disable damping for immediate, responsive control
@@ -747,7 +681,7 @@ const GoogleMaps = () => {
 
       document.removeEventListener("click", handleClickOutside);
     };
-  }, [showSearchResults, showShareMenu]);
+  }, [showSearchResults, showShareMenu, createProceduralMoon]);
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-black select-none">
