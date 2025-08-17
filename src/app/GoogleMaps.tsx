@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 const GoogleMaps = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -314,266 +314,6 @@ const GoogleMaps = () => {
     return { stars, brightStars };
   };
 
-  // Enhanced procedural moon creation - now the primary method
-  const createProceduralMoon = useCallback(() => {
-    try {
-      console.log("Creating procedural Moon...");
-
-      // Create moon geometry with higher detail
-      const moonGeometry = new THREE.SphereGeometry(1, 128, 64);
-
-      // Create realistic moon texture using canvas with enhanced detail
-      const canvas = document.createElement("canvas");
-      canvas.width = 2048;
-      canvas.height = 1024;
-      const ctx = canvas.getContext("2d")!;
-
-      // Base moon color with realistic gradients
-      const gradient = ctx.createRadialGradient(
-        canvas.width * 0.3,
-        canvas.height * 0.3,
-        0,
-        canvas.width * 0.5,
-        canvas.height * 0.5,
-        canvas.width * 0.7
-      );
-      gradient.addColorStop(0, "#c4c4c4");
-      gradient.addColorStop(0.3, "#b8b8b8");
-      gradient.addColorStop(0.6, "#a0a0a0");
-      gradient.addColorStop(1, "#888888");
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Add realistic lunar maria (dark areas)
-      const maria = [
-        {
-          x: 400,
-          y: 300,
-          w: 200,
-          h: 160,
-          darkness: 0.4,
-          name: "Mare Tranquillitatis",
-        },
-        {
-          x: 800,
-          y: 200,
-          w: 180,
-          h: 140,
-          darkness: 0.35,
-          name: "Mare Imbrium",
-        },
-        {
-          x: 1200,
-          y: 400,
-          w: 120,
-          h: 100,
-          darkness: 0.45,
-          name: "Mare Serenitatis",
-        },
-        { x: 300, y: 600, w: 140, h: 120, darkness: 0.4, name: "Mare Crisium" },
-        {
-          x: 1400,
-          y: 300,
-          w: 160,
-          h: 140,
-          darkness: 0.3,
-          name: "Oceanus Procellarum",
-        },
-        {
-          x: 600,
-          y: 100,
-          w: 100,
-          h: 80,
-          darkness: 0.35,
-          name: "Mare Serenitatis",
-        },
-      ];
-
-      maria.forEach((mare) => {
-        const mariaGradient = ctx.createRadialGradient(
-          mare.x,
-          mare.y,
-          0,
-          mare.x,
-          mare.y,
-          Math.max(mare.w, mare.h)
-        );
-        mariaGradient.addColorStop(0, `rgba(0, 0, 0, ${mare.darkness})`);
-        mariaGradient.addColorStop(
-          0.7,
-          `rgba(0, 0, 0, ${mare.darkness * 0.7})`
-        );
-        mariaGradient.addColorStop(1, "rgba(0, 0, 0, 0)");
-        ctx.fillStyle = mariaGradient;
-        ctx.ellipse(mare.x, mare.y, mare.w / 2, mare.h / 2, 0, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      // Add major craters with realistic details
-      const majorCraters = [
-        { x: 1600, y: 700, size: 60, darkness: 0.6, name: "Tycho" },
-        { x: 1000, y: 600, size: 45, darkness: 0.5, name: "Copernicus" },
-        { x: 500, y: 500, size: 35, darkness: 0.45, name: "Kepler" },
-        { x: 1300, y: 500, size: 50, darkness: 0.55, name: "Aristarchus" },
-        { x: 700, y: 300, size: 40, darkness: 0.5, name: "Plato" },
-      ];
-
-      majorCraters.forEach((crater) => {
-        // Main crater
-        const craterGradient = ctx.createRadialGradient(
-          crater.x,
-          crater.y,
-          0,
-          crater.x,
-          crater.y,
-          crater.size
-        );
-        craterGradient.addColorStop(0, `rgba(0, 0, 0, ${crater.darkness})`);
-        craterGradient.addColorStop(
-          0.6,
-          `rgba(0, 0, 0, ${crater.darkness * 0.8})`
-        );
-        craterGradient.addColorStop(
-          0.9,
-          `rgba(0, 0, 0, ${crater.darkness * 0.3})`
-        );
-        craterGradient.addColorStop(1, "rgba(0, 0, 0, 0)");
-        ctx.fillStyle = craterGradient;
-        ctx.beginPath();
-        ctx.arc(crater.x, crater.y, crater.size, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Crater rim highlight
-        const rimGradient = ctx.createRadialGradient(
-          crater.x,
-          crater.y,
-          crater.size * 0.8,
-          crater.x,
-          crater.y,
-          crater.size * 1.2
-        );
-        rimGradient.addColorStop(0, "rgba(255, 255, 255, 0)");
-        rimGradient.addColorStop(0.5, "rgba(255, 255, 255, 0.1)");
-        rimGradient.addColorStop(1, "rgba(255, 255, 255, 0)");
-        ctx.fillStyle = rimGradient;
-        ctx.beginPath();
-        ctx.arc(crater.x, crater.y, crater.size * 1.2, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      // Add hundreds of smaller craters for realism
-      for (let i = 0; i < 200; i++) {
-        const x = Math.random() * canvas.width;
-        const y = Math.random() * canvas.height;
-        const size = Math.random() * 25 + 3;
-        const darkness = Math.random() * 0.4 + 0.2;
-
-        const craterGradient = ctx.createRadialGradient(x, y, 0, x, y, size);
-        craterGradient.addColorStop(0, `rgba(0, 0, 0, ${darkness})`);
-        craterGradient.addColorStop(0.7, `rgba(0, 0, 0, ${darkness * 0.5})`);
-        craterGradient.addColorStop(1, "rgba(0, 0, 0, 0)");
-        ctx.fillStyle = craterGradient;
-        ctx.beginPath();
-        ctx.arc(x, y, size, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Add surface texture details
-      for (let i = 0; i < 1000; i++) {
-        const x = Math.random() * canvas.width;
-        const y = Math.random() * canvas.height;
-        const size = Math.random() * 3 + 1;
-        const opacity = Math.random() * 0.2 + 0.1;
-
-        ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
-        ctx.beginPath();
-        ctx.arc(x, y, size, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Create texture from canvas
-      const moonTexture = new THREE.CanvasTexture(canvas);
-      moonTexture.needsUpdate = true;
-
-      // Create enhanced normal map for surface detail
-      const normalCanvas = document.createElement("canvas");
-      normalCanvas.width = 1024;
-      normalCanvas.height = 512;
-      const normalCtx = normalCanvas.getContext("2d")!;
-
-      // Base normal map color (neutral)
-      normalCtx.fillStyle = "#8080ff";
-      normalCtx.fillRect(0, 0, normalCanvas.width, normalCanvas.height);
-
-      // Add surface variations for normal mapping
-      for (let i = 0; i < 500; i++) {
-        const x = Math.random() * normalCanvas.width;
-        const y = Math.random() * normalCanvas.height;
-        const size = Math.random() * 30 + 5;
-        const intensity = Math.random() * 0.3 + 0.1;
-
-        const normalGradient = normalCtx.createRadialGradient(
-          x,
-          y,
-          0,
-          x,
-          y,
-          size
-        );
-        normalGradient.addColorStop(0, `rgba(96, 96, 255, ${intensity})`);
-        normalGradient.addColorStop(1, "rgba(128, 128, 255, 0)");
-        normalCtx.fillStyle = normalGradient;
-        normalCtx.beginPath();
-        normalCtx.arc(x, y, size, 0, Math.PI * 2);
-        normalCtx.fill();
-      }
-
-      const normalTexture = new THREE.CanvasTexture(normalCanvas);
-      normalTexture.needsUpdate = true;
-
-      // Create enhanced moon material
-      const moonMaterial = new THREE.MeshStandardMaterial({
-        map: moonTexture,
-        normalMap: normalTexture,
-        normalScale: new THREE.Vector2(0.5, 0.5),
-        roughness: 0.9,
-        metalness: 0.0,
-        color: new THREE.Color(0xffffff),
-      });
-
-      // Create moon mesh
-      const moonMesh = new THREE.Mesh(moonGeometry, moonMaterial);
-      const moonGroup = new THREE.Group();
-      moonGroup.add(moonMesh);
-
-      if (sceneRef.current) {
-        sceneRef.current.add(moonGroup);
-        moonRef.current = moonGroup;
-
-        // Add text on the Moon surface
-        createTextOnSurface(
-          "742d35Cc6634C0532925a3b8D63C4e64c6A6E6E2",
-          new THREE.Vector3(-0.09, 0.15, 1.05),
-          sceneRef.current,
-          0.04
-        );
-
-        createTextOnSurface(
-          "Pump.fun",
-          new THREE.Vector3(-0.15, -0.05, 1.05),
-          sceneRef.current,
-          0.035
-        );
-      }
-
-      console.log("Enhanced procedural Moon created successfully!");
-      return true;
-    } catch (error) {
-      console.error("Failed to create procedural moon:", error);
-      return false;
-    }
-  }, []);
-
   useEffect(() => {
     setIsClient(true);
   }, []);
@@ -625,14 +365,109 @@ const GoogleMaps = () => {
     fillLight.position.set(0, -5, 0);
     scene.add(fillLight);
 
-    // Load OrbitControls dynamically
-    const loadControls = async () => {
+    // Load NASA Moon model
+    const loadMoon = async () => {
       try {
-        // Use dynamic import to avoid SSR issues
-        const { OrbitControls } = await import(
-          "three/examples/jsm/controls/OrbitControls.js"
+        const { GLTFLoader } = await import(
+          "three/examples/jsm/loaders/GLTFLoader.js"
         );
+        const loader = new GLTFLoader();
 
+        const gltf = await new Promise<unknown>((resolve, reject) => {
+          loader.load(
+            "https://solarsystem.nasa.gov/rails/active_storage/blobs/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBcllRIiwiZXhwIjpudWxsLCJwdXIiOiJibG9iX2lkIn19--7d626e5badbf2157a4fa43b9e891ab22ca767f3e/Moon_1_3474.glb",
+            resolve,
+            undefined,
+            reject
+          );
+        });
+
+        if (gltf && typeof gltf === "object" && "scene" in gltf) {
+          const moonModel = (gltf as { scene: THREE.Group }).scene;
+
+          // Scale and position
+          const box = new THREE.Box3().setFromObject(moonModel);
+          const size = box.getSize(new THREE.Vector3());
+          const center = box.getCenter(new THREE.Vector3());
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const scale = 2 / maxDim;
+
+          moonModel.scale.setScalar(scale);
+          moonModel.position.x = -center.x * scale;
+          moonModel.position.y = -center.y * scale;
+          moonModel.position.z = -center.z * scale;
+
+          // Enhance Moon materials for proper NASA appearance
+          moonModel.traverse((child: THREE.Object3D) => {
+            if (child instanceof THREE.Mesh) {
+              if (child.material) {
+                if (Array.isArray(child.material)) {
+                  child.material.forEach((mat: THREE.Material) => {
+                    const material = mat as
+                      | THREE.MeshStandardMaterial
+                      | THREE.MeshPhongMaterial;
+                    if (
+                      material.type === "MeshStandardMaterial" ||
+                      material.type === "MeshPhongMaterial"
+                    ) {
+                      // Brighten the Moon materials
+                      if ("roughness" in material) material.roughness = 0.7;
+                      if ("metalness" in material) material.metalness = 0.0;
+                      if (material.color) {
+                        material.color.multiplyScalar(1.5);
+                      }
+                      material.needsUpdate = true;
+                    }
+                  });
+                } else {
+                  const material = child.material as
+                    | THREE.MeshStandardMaterial
+                    | THREE.MeshPhongMaterial;
+                  if (
+                    material.type === "MeshStandardMaterial" ||
+                    material.type === "MeshPhongMaterial"
+                  ) {
+                    // Brighten the Moon materials
+                    if ("roughness" in material) material.roughness = 0.7;
+                    if ("metalness" in material) material.metalness = 0.0;
+                    if (material.color) {
+                      material.color.multiplyScalar(1.5);
+                    }
+                    material.needsUpdate = true;
+                  }
+                }
+              }
+            }
+          });
+
+          scene.add(moonModel);
+          moonRef.current = moonModel;
+
+          // Add text on the Moon surface - moved more to the left for better centering
+          createTextOnSurface(
+            "742d35Cc6634C0532925a3b8D63C4e64c6A6E6E2",
+            new THREE.Vector3(-0.09, 0.15, 1.05),
+            scene,
+            0.04
+          );
+
+          createTextOnSurface(
+            "Pump.fun",
+            new THREE.Vector3(-0.15, -0.05, 1.05),
+            scene,
+            0.035
+          );
+
+          console.log("Moon loaded successfully!");
+        }
+      } catch (error) {
+        console.error("Failed to load Moon:", error);
+      }
+    };
+
+    // Load OrbitControls
+    const loadControls = () => {
+      try {
         const controls = new OrbitControls(camera, renderer.domElement);
 
         // Disable damping for immediate, responsive control
@@ -642,7 +477,7 @@ const GoogleMaps = () => {
         controls.minDistance = 2;
         controls.maxDistance = 10;
         controls.autoRotate = true;
-        controls.autoRotateSpeed = 1;
+        controls.autoRotateSpeed = 0.2;
 
         // Make controls more responsive
         controls.rotateSpeed = 1.0;
@@ -659,31 +494,12 @@ const GoogleMaps = () => {
         });
 
         controlsRef.current = controls;
-        console.log("OrbitControls loaded successfully");
       } catch (error) {
-        console.error("Failed to load OrbitControls:", error);
+        console.error("Failed to load controls:", error);
       }
     };
 
-    // Create the moon immediately using procedural generation
-    const moonCreated = createProceduralMoon();
-    if (!moonCreated) {
-      console.error("Failed to create any moon, creating basic fallback");
-      // Ultimate fallback - simple sphere
-      const fallbackGeometry = new THREE.SphereGeometry(1, 32, 16);
-      const fallbackMaterial = new THREE.MeshStandardMaterial({
-        color: 0xaaaaaa,
-        roughness: 0.8,
-        metalness: 0.0,
-      });
-      const fallbackMesh = new THREE.Mesh(fallbackGeometry, fallbackMaterial);
-      const fallbackGroup = new THREE.Group();
-      fallbackGroup.add(fallbackMesh);
-      scene.add(fallbackGroup);
-      moonRef.current = fallbackGroup;
-      console.log("Basic fallback moon created");
-    }
-
+    loadMoon();
     loadControls();
 
     // Animation loop
@@ -750,7 +566,7 @@ const GoogleMaps = () => {
 
       document.removeEventListener("click", handleClickOutside);
     };
-  }, [showSearchResults, showShareMenu, createProceduralMoon]);
+  }, [showSearchResults, showShareMenu]);
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-black select-none">
