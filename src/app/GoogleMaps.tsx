@@ -143,12 +143,6 @@ const MoonViewer = () => {
     setShowContextMenu(false);
   };
 
-  const handleClose = () => {
-    if (typeof window !== "undefined") {
-      window.history.back();
-    }
-  };
-
   // Create text geometry that appears on the Moon surface
   const createTextOnSurface = (
     text: string,
@@ -378,7 +372,7 @@ const MoonViewer = () => {
         );
         const loader = new GLTFLoader();
 
-        const gltf = await new Promise<any>((resolve, reject) => {
+        const gltf = await new Promise<unknown>((resolve, reject) => {
           loader.load(
             "https://solarsystem.nasa.gov/rails/active_storage/blobs/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBcllRIiwiZXhwIjpudWxsLCJwdXIiOiJibG9iX2lkIn19--7d626e5badbf2157a4fa43b9e891ab22ca767f3e/Moon_1_3474.glb",
             resolve,
@@ -451,7 +445,7 @@ const MoonViewer = () => {
           // FIXED: Add text on the Moon surface - moved more to the left for better centering
           const contractText = createTextOnSurface(
             "742d35Cc6634C0532925a3b8D63C4e64c6A6E6E2",
-            new THREE.Vector3(-0.12, 0.15, 1.05), // Moved further left by 0.15
+            new THREE.Vector3(-0.15, 0.15, 1.05), // Moved further left by 0.15
             scene,
             0.04
           );
