@@ -12,7 +12,6 @@ const MoonViewer = () => {
     y: 0,
   });
   const [showShareMenu, setShowShareMenu] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<string[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -22,9 +21,12 @@ const MoonViewer = () => {
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const moonRef = useRef<THREE.Group | null>(null);
   const animationIdRef = useRef<number | null>(null);
-  const controlsRef = useRef<any>(null);
+  const controlsRef = useRef<THREE.OrbitControls | null>(null);
   const isUserInteractingRef = useRef(false);
-  const starFieldRef = useRef<any>(null);
+  const starFieldRef = useRef<{
+    stars: THREE.Points;
+    brightStars: THREE.Points;
+  } | null>(null);
 
   const handleSearch = (e: React.KeyboardEvent) => {
     e.preventDefault();
@@ -71,17 +73,9 @@ const MoonViewer = () => {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // Adjust for header and footer areas
-    const headerHeight = 32; // 8 * 4 = 32px (h-8)
-    const footerHeight = 24; // 6 * 4 = 24px (h-6)
-    const mapHeight = rect.height - headerHeight - footerHeight;
-    const mapY = y - headerHeight;
-
-    if (mapY < 0 || mapY > mapHeight) return; // Click was in header/footer
-
     // Convert click position to normalized coordinates
     const normalizedX = (x / rect.width - 0.5) * 2;
-    const normalizedY = (mapY / mapHeight - 0.5) * 2;
+    const normalizedY = (y / rect.height - 0.5) * 2;
 
     // Update camera position based on minimap click
     const azimuth = normalizedX * Math.PI;
@@ -413,27 +407,38 @@ const MoonViewer = () => {
             if (child instanceof THREE.Mesh) {
               if (child.material) {
                 if (Array.isArray(child.material)) {
-                  child.material.forEach((mat: any) => {
-                    if (mat.isMeshStandardMaterial || mat.isMeshPhongMaterial) {
+                  child.material.forEach((mat: THREE.Material) => {
+                    const material = mat as
+                      | THREE.MeshStandardMaterial
+                      | THREE.MeshPhongMaterial;
+                    if (
+                      material.type === "MeshStandardMaterial" ||
+                      material.type === "MeshPhongMaterial"
+                    ) {
                       // Brighten the Moon materials
-                      mat.roughness = 0.7; // Less rough for more brightness
-                      mat.metalness = 0.0;
-                      if (mat.color) {
-                        mat.color.multiplyScalar(1.5); // Brighten the base color
+                      if ("roughness" in material) material.roughness = 0.7;
+                      if ("metalness" in material) material.metalness = 0.0;
+                      if (material.color) {
+                        material.color.multiplyScalar(1.5);
                       }
-                      mat.needsUpdate = true;
+                      material.needsUpdate = true;
                     }
                   });
                 } else {
-                  const mat = child.material as any;
-                  if (mat.isMeshStandardMaterial || mat.isMeshPhongMaterial) {
+                  const material = child.material as
+                    | THREE.MeshStandardMaterial
+                    | THREE.MeshPhongMaterial;
+                  if (
+                    material.type === "MeshStandardMaterial" ||
+                    material.type === "MeshPhongMaterial"
+                  ) {
                     // Brighten the Moon materials
-                    mat.roughness = 0.7; // Less rough for more brightness
-                    mat.metalness = 0.0;
-                    if (mat.color) {
-                      mat.color.multiplyScalar(1.5); // Brighten the base color
+                    if ("roughness" in material) material.roughness = 0.7;
+                    if ("metalness" in material) material.metalness = 0.0;
+                    if (material.color) {
+                      material.color.multiplyScalar(1.5);
                     }
-                    mat.needsUpdate = true;
+                    material.needsUpdate = true;
                   }
                 }
               }
@@ -446,7 +451,7 @@ const MoonViewer = () => {
           // FIXED: Add text on the Moon surface - moved more to the left for better centering
           const contractText = createTextOnSurface(
             "742d35Cc6634C0532925a3b8D63C4e64c6A6E6E2",
-            new THREE.Vector3(-0.08, 0.15, 1.05), // Moved further left by 0.15
+            new THREE.Vector3(-0.12, 0.15, 1.05), // Moved further left by 0.15
             scene,
             0.04
           );
@@ -459,11 +464,9 @@ const MoonViewer = () => {
           );
 
           console.log("Moon loaded successfully!");
-          // setIsLoading(false); // Removed since we start with loading false
         }
       } catch (error) {
         console.error("Failed to load Moon:", error);
-        // setIsLoading(false); // Removed since we start with loading false
       }
     };
 
@@ -551,13 +554,9 @@ const MoonViewer = () => {
 
     return () => {
       // Close share menu and search results when clicking outside
-      const handleClickOutside = (e: MouseEvent) => {
-        if (showShareMenu) {
-          setShowShareMenu(false);
-        }
-        if (showSearchResults) {
-          setShowSearchResults(false);
-        }
+      const handleClickOutside = () => {
+        setShowShareMenu(false);
+        setShowSearchResults(false);
       };
       document.addEventListener("click", handleClickOutside);
 
@@ -575,7 +574,7 @@ const MoonViewer = () => {
 
       document.removeEventListener("click", handleClickOutside);
     };
-  }, []);
+  }, [showSearchResults, showShareMenu]);
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-black select-none">
@@ -598,27 +597,8 @@ const MoonViewer = () => {
           className="w-full h-full bg-white rounded-lg shadow-xl border border-gray-300 cursor-pointer hover:shadow-2xl transition-shadow relative overflow-hidden"
           title="Click to navigate view"
         >
-          {/* Header Bar */}
-          <div className="absolute top-0 left-0 right-0 h-8 bg-gray-50 border-b border-gray-200 flex items-center justify-between px-3 z-10">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-blue-500 rounded-sm"></div>
-              <span className="text-xs font-medium text-gray-700">
-                Satellite
-              </span>
-            </div>
-            <button className="w-4 h-4 flex items-center justify-center">
-              <svg
-                className="w-3 h-3 text-gray-500"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path d="M12,16A2,2 0 0,1 14,18A2,2 0 0,1 12,20A2,2 0 0,1 10,18A2,2 0 0,1 12,16M12,10A2,2 0 0,1 14,12A2,2 0 0,1 12,14A2,2 0 0,1 10,12A2,2 0 0,1 12,10M12,4A2,2 0 0,1 14,6A2,2 0 0,1 12,8A2,2 0 0,1 10,6A2,2 0 0,1 12,4Z" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Map View Area */}
-          <div className="absolute top-8 left-0 right-0 bottom-0 bg-black">
+          {/* Map View Area - Full height now without header */}
+          <div className="absolute inset-0 bg-black">
             {/* Space Background with Stars */}
             <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-900">
               {/* Fixed star positions to prevent hydration mismatch */}
@@ -709,7 +689,7 @@ const MoonViewer = () => {
           </div>
 
           {/* Compass */}
-          <div className="absolute top-10 right-2 w-6 h-6 bg-white rounded-full shadow-md border border-gray-300 flex items-center justify-center">
+          <div className="absolute top-2 right-2 w-6 h-6 bg-white rounded-full shadow-md border border-gray-300 flex items-center justify-center">
             <svg
               className="w-3 h-3 text-red-500"
               fill="currentColor"
@@ -720,7 +700,7 @@ const MoonViewer = () => {
           </div>
 
           {/* Click Interaction Hint */}
-          <div className="absolute top-10 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
+          <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
             Click to navigate
           </div>
         </div>
@@ -865,7 +845,7 @@ const MoonViewer = () => {
                   handleSearch({
                     preventDefault: () => {},
                     key: "Enter",
-                  } as any)
+                  } as React.KeyboardEvent)
                 }
                 className="mr-3 p-1.5 bg-blue-500 hover:bg-blue-600 rounded-md transition-colors cursor-pointer"
               >
@@ -981,7 +961,7 @@ const MoonViewer = () => {
                     onClick={() => {
                       if (navigator.share) {
                         navigator.share({
-                          title: "Google Earth - Moon",
+                          title: "Google Earth Moon",
                           text: "Experience the Moon in stunning detail with Google Earth!",
                           url: window.location.href,
                         });
@@ -1065,7 +1045,6 @@ const MoonViewer = () => {
           <div className="text-xs sm:text-sm text-gray-300 space-y-1">
             <div>Satellite Imagery</div>
             <div>High-Resolution Lunar Surface</div>
-            <div>3D Interactive Model</div>
           </div>
         </div>
       </div>
