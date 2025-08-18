@@ -44,6 +44,7 @@ const GoogleMaps = () => {
     stars: THREE.Points;
     brightStars: THREE.Points;
   } | null>(null);
+  const textMeshesRef = useRef<THREE.Mesh[]>([]);
 
   const handleSearch = (e: React.KeyboardEvent) => {
     e.preventDefault();
@@ -152,12 +153,15 @@ const GoogleMaps = () => {
     setShowContextMenu(false);
   };
 
-  const createTextOnSurface = (
+  const createCenteredTextOnSurface = (
     text: string,
-    position: THREE.Vector3,
+    latitude: number, // in degrees (-90 to 90)
+    longitude: number, // in degrees (-180 to 180)
     scene: THREE.Scene,
-    fontSize: number = 0.05
+    fontSize: number = 0.05,
+    moonRadius: number = 1.0
   ) => {
+    // Create canvas for text
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d")!;
     canvas.width = 2048;
@@ -190,11 +194,48 @@ const GoogleMaps = () => {
     const geometry = new THREE.PlaneGeometry(1.6, 0.2);
     const textMesh = new THREE.Mesh(geometry, material);
 
-    textMesh.position.copy(position);
-    textMesh.lookAt(cameraRef.current?.position || new THREE.Vector3(0, 0, 5));
+    // Convert lat/lon to spherical coordinates
+    const latRad = (latitude * Math.PI) / 180;
+    const lonRad = (longitude * Math.PI) / 180;
+
+    // Calculate position on moon surface (slightly above surface)
+    const offsetDistance = moonRadius + 0.05;
+    const x = offsetDistance * Math.cos(latRad) * Math.cos(lonRad);
+    const y = offsetDistance * Math.sin(latRad);
+    const z = offsetDistance * Math.cos(latRad) * Math.sin(lonRad);
+
+    textMesh.position.set(x, y, z);
+
+    // Calculate the normal vector pointing outward from the moon center
+    const normal = new THREE.Vector3(x, y, z).normalize();
+
+    // Make the text face the camera by calculating the proper rotation
+    const updateTextRotation = () => {
+      if (cameraRef.current) {
+        // Create a rotation that faces the camera while staying tangent to the sphere
+        const cameraDirection = cameraRef.current.position.clone().normalize();
+
+        // Calculate tangent direction (perpendicular to normal and camera direction)
+        const tangent = new THREE.Vector3()
+          .crossVectors(normal, cameraDirection)
+          .normalize();
+        const bitangent = new THREE.Vector3()
+          .crossVectors(tangent, normal)
+          .normalize();
+
+        // Create rotation matrix
+        const matrix = new THREE.Matrix4();
+        matrix.makeBasis(tangent, bitangent, normal);
+        textMesh.setRotationFromMatrix(matrix);
+      }
+    };
+
+    updateTextRotation();
 
     scene.add(textMesh);
-    return textMesh;
+    textMeshesRef.current.push(textMesh);
+
+    return { textMesh, updateRotation: updateTextRotation };
   };
 
   const createStarField = (scene: THREE.Scene) => {
@@ -355,6 +396,9 @@ const GoogleMaps = () => {
     const fillLight = new THREE.DirectionalLight(0xffffff, 0.6);
     fillLight.position.set(0, -5, 0);
     scene.add(fillLight);
+
+    // Store text update functions
+    const textUpdateFunctions: (() => void)[] = [];
 
     // Load NASA Moon model - FIXED VERSION
     const loadMoon = async () => {
@@ -527,21 +571,29 @@ const GoogleMaps = () => {
               console.log("Moon model added to scene successfully!");
               modelLoaded = true;
 
-              // Add text overlays after moon is loaded
+              // Add centered text overlays after moon is loaded
               setTimeout(() => {
-                createTextOnSurface(
+                // Contract address - positioned to appear centered when viewing from front
+                const contractText = createCenteredTextOnSurface(
                   "742d35Cc6634C0532925a3b8D63C4e64c6A6E6E2",
-                  new THREE.Vector3(-0.09, 0.15, 1.05),
+                  5, // 5 degrees north latitude
+                  90, // 90 degrees longitude to appear centered from front view
                   scene,
-                  0.04
+                  0.04,
+                  1.0
                 );
+                textUpdateFunctions.push(contractText.updateRotation);
 
-                createTextOnSurface(
+                // Pump.fun text - positioned slightly below
+                const pumpText = createCenteredTextOnSurface(
                   "Pump.fun",
-                  new THREE.Vector3(-0.15, -0.05, 1.05),
+                  -5, // 5 degrees south latitude
+                  90, // 90 degrees longitude to appear centered from front view
                   scene,
-                  0.035
+                  0.035,
+                  1.0
                 );
+                textUpdateFunctions.push(pumpText.updateRotation);
               }, 100);
             } else {
               throw new Error("Invalid GLTF model structure");
@@ -615,21 +667,29 @@ const GoogleMaps = () => {
         scene.add(moonGroup);
         moonRef.current = moonGroup;
 
-        // Add text overlays to fallback moon too
+        // Add centered text overlays to fallback moon too
         setTimeout(() => {
-          createTextOnSurface(
+          // Contract address - positioned to appear centered from front view
+          const contractText = createCenteredTextOnSurface(
             "742d35Cc6634C0532925a3b8D63C4e64c6A6E6E2",
-            new THREE.Vector3(-0.09, 0.15, 1.05),
+            5, // 5 degrees north latitude
+            90, // 90 degrees longitude to appear centered from front view
             scene,
-            0.04
+            0.04,
+            1.0
           );
+          textUpdateFunctions.push(contractText.updateRotation);
 
-          createTextOnSurface(
+          // Pump.fun text - positioned slightly below
+          const pumpText = createCenteredTextOnSurface(
             "Pump.fun",
-            new THREE.Vector3(-0.15, -0.05, 1.05),
+            -5, // 5 degrees south latitude
+            90, // 90 degrees longitude to appear centered from front view
             scene,
-            0.035
+            0.035,
+            1.0
           );
+          textUpdateFunctions.push(pumpText.updateRotation);
         }, 100);
 
         console.log("Fallback moon created!");
@@ -701,6 +761,9 @@ const GoogleMaps = () => {
         }
       }
 
+      // Update text rotations to always face the camera
+      textUpdateFunctions.forEach((updateFn) => updateFn());
+
       renderer.render(scene, camera);
     };
     animate();
@@ -724,6 +787,19 @@ const GoogleMaps = () => {
       if (controlsRef.current) {
         controlsRef.current.dispose();
       }
+      // Clean up text meshes
+      textMeshesRef.current.forEach((mesh) => {
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) {
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach((mat) => mat.dispose());
+          } else {
+            mesh.material.dispose();
+          }
+        }
+      });
+      textMeshesRef.current = [];
+
       if (renderer && container && container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
         renderer.dispose();

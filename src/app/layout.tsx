@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/moon-preview.jpg", // Put your image in public folder
+        url: "/moon-preview.png",
         width: 1200,
         height: 630,
         alt: "Google Earth Moon Explorer",
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     title: "Google Earth - Moon",
     description:
       "Explore the Moon in stunning detail with Google Earth. High-resolution lunar surface imagery powered by NASA data.",
-    images: ["/moon-preview.jpg"],
+    images: ["/moon-preview.png"],
   },
 };
 
