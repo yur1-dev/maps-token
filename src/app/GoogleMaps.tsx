@@ -3,6 +3,22 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
+// Define proper types for OrbitControls
+interface OrbitControlsType {
+  enableDamping: boolean;
+  minDistance: number;
+  maxDistance: number;
+  autoRotate: boolean;
+  autoRotateSpeed: number;
+  rotateSpeed: number;
+  zoomSpeed: number;
+  panSpeed: number;
+  target: THREE.Vector3;
+  addEventListener: (event: string, callback: () => void) => void;
+  update: () => void;
+  dispose: () => void;
+}
+
 const GoogleMaps = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -22,7 +38,7 @@ const GoogleMaps = () => {
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const moonRef = useRef<THREE.Group | null>(null);
   const animationIdRef = useRef<number | null>(null);
-  const controlsRef = useRef<any>(null);
+  const controlsRef = useRef<OrbitControlsType | null>(null);
   const isUserInteractingRef = useRef(false);
   const starFieldRef = useRef<{
     stars: THREE.Points;
@@ -352,7 +368,7 @@ const GoogleMaps = () => {
 
         // Try multiple URLs: local first, then NASA as fallback
         const moonUrls = [
-          "/moon.glb", // Local file (primary)
+          "/Moon_1_3474.glb", // Local file (using exact filename from your public folder)
           "https://solarsystem.nasa.gov/rails/active_storage/blobs/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBcllRIiwiZXhwIjpudWxsLCJwdXIiOiJibG9iX2lkIn19--7d626e5badbf2157a4fa43b9e891ab22ca767f3e/Moon_1_3474.glb", // NASA fallback
         ];
 
@@ -364,29 +380,31 @@ const GoogleMaps = () => {
           try {
             console.log(`Trying to load moon from: ${url}`);
 
-            const gltf = await new Promise<any>((resolve, reject) => {
-              const timeoutId = setTimeout(() => {
-                reject(new Error("Model loading timeout"));
-              }, 10000);
+            const gltf = await new Promise<{ scene: THREE.Group }>(
+              (resolve, reject) => {
+                const timeoutId = setTimeout(() => {
+                  reject(new Error("Model loading timeout"));
+                }, 15000); // Increased timeout
 
-              loader.load(
-                url,
-                (result) => {
-                  clearTimeout(timeoutId);
-                  resolve(result);
-                },
-                (progress) => {
-                  console.log(
-                    "Loading progress:",
-                    (progress.loaded / progress.total) * 100 + "%"
-                  );
-                },
-                (error) => {
-                  clearTimeout(timeoutId);
-                  reject(error);
-                }
-              );
-            });
+                loader.load(
+                  url,
+                  (result) => {
+                    clearTimeout(timeoutId);
+                    resolve(result);
+                  },
+                  (progress) => {
+                    console.log(
+                      "Loading progress:",
+                      (progress.loaded / progress.total) * 100 + "%"
+                    );
+                  },
+                  (error) => {
+                    clearTimeout(timeoutId);
+                    reject(error);
+                  }
+                );
+              }
+            );
 
             if (gltf && gltf.scene) {
               const moonModel = gltf.scene;
@@ -425,7 +443,18 @@ const GoogleMaps = () => {
                   if (child.material) {
                     if (Array.isArray(child.material)) {
                       child.material.forEach((mat: THREE.Material) => {
-                        const material = mat as any;
+                        // Type assertion for material properties
+                        const material = mat as THREE.MeshStandardMaterial & {
+                          visible: boolean;
+                          transparent: boolean;
+                          opacity: number;
+                          color?: THREE.Color;
+                          roughness?: number;
+                          metalness?: number;
+                          emissive?: THREE.Color;
+                          needsUpdate: boolean;
+                        };
+
                         // Ensure the material is visible
                         material.visible = true;
                         material.transparent = false;
@@ -433,20 +462,32 @@ const GoogleMaps = () => {
 
                         if (material.color) {
                           // Brighten the material
-                          material.color.multiplyScalar(1.3);
+                          material.color.multiplyScalar(1.5);
                         }
 
                         // Set material properties for better visibility
                         if (material.type === "MeshStandardMaterial") {
                           material.roughness = 0.8;
                           material.metalness = 0.0;
-                          material.emissive = new THREE.Color(0x222222);
+                          material.emissive = new THREE.Color(0x333333);
                         }
 
                         material.needsUpdate = true;
                       });
                     } else {
-                      const material = child.material as any;
+                      // Type assertion for single material
+                      const material =
+                        child.material as THREE.MeshStandardMaterial & {
+                          visible: boolean;
+                          transparent: boolean;
+                          opacity: number;
+                          color?: THREE.Color;
+                          roughness?: number;
+                          metalness?: number;
+                          emissive?: THREE.Color;
+                          needsUpdate: boolean;
+                        };
+
                       // Ensure the material is visible
                       material.visible = true;
                       material.transparent = false;
@@ -454,14 +495,14 @@ const GoogleMaps = () => {
 
                       if (material.color) {
                         // Brighten the material
-                        material.color.multiplyScalar(1.3);
+                        material.color.multiplyScalar(1.5);
                       }
 
                       // Set material properties for better visibility
                       if (material.type === "MeshStandardMaterial") {
                         material.roughness = 0.8;
                         material.metalness = 0.0;
-                        material.emissive = new THREE.Color(0x222222);
+                        material.emissive = new THREE.Color(0x333333);
                       }
 
                       material.needsUpdate = true;
@@ -521,9 +562,50 @@ const GoogleMaps = () => {
         // Create a simple visible sphere as fallback
         console.log("Creating fallback moon sphere...");
         const geometry = new THREE.SphereGeometry(1, 64, 32);
+
+        // Create a more detailed moon texture for fallback
+        const canvas = document.createElement("canvas");
+        canvas.width = 1024;
+        canvas.height = 512;
+        const context = canvas.getContext("2d")!;
+
+        // Base moon color
+        context.fillStyle = "#D3D3D3";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Add some crater-like features
+        const craters = [
+          { x: 256, y: 128, radius: 40, color: "#A0A0A0" },
+          { x: 512, y: 256, radius: 60, color: "#909090" },
+          { x: 768, y: 200, radius: 30, color: "#B0B0B0" },
+          { x: 200, y: 350, radius: 25, color: "#A5A5A5" },
+          { x: 600, y: 150, radius: 35, color: "#959595" },
+          { x: 400, y: 400, radius: 45, color: "#888888" },
+        ];
+
+        craters.forEach((crater) => {
+          context.beginPath();
+          context.arc(crater.x, crater.y, crater.radius, 0, Math.PI * 2);
+          context.fillStyle = crater.color;
+          context.fill();
+
+          // Add inner shadow for depth
+          context.beginPath();
+          context.arc(
+            crater.x + crater.radius * 0.3,
+            crater.y + crater.radius * 0.3,
+            crater.radius * 0.7,
+            0,
+            Math.PI * 2
+          );
+          context.fillStyle = "#666666";
+          context.fill();
+        });
+
+        const texture = new THREE.CanvasTexture(canvas);
         const material = new THREE.MeshLambertMaterial({
-          color: 0xcccccc,
-          emissive: 0x111111,
+          map: texture,
+          emissive: new THREE.Color(0x111111),
         });
 
         const moonMesh = new THREE.Mesh(geometry, material);
@@ -532,6 +614,23 @@ const GoogleMaps = () => {
 
         scene.add(moonGroup);
         moonRef.current = moonGroup;
+
+        // Add text overlays to fallback moon too
+        setTimeout(() => {
+          createTextOnSurface(
+            "742d35Cc6634C0532925a3b8D63C4e64c6A6E6E2",
+            new THREE.Vector3(-0.09, 0.15, 1.05),
+            scene,
+            0.04
+          );
+
+          createTextOnSurface(
+            "Pump.fun",
+            new THREE.Vector3(-0.15, -0.05, 1.05),
+            scene,
+            0.035
+          );
+        }, 100);
 
         console.log("Fallback moon created!");
       }
@@ -543,7 +642,10 @@ const GoogleMaps = () => {
         const { OrbitControls } = await import(
           "three/examples/jsm/controls/OrbitControls.js"
         );
-        const controls = new OrbitControls(camera, renderer.domElement);
+        const controls = new OrbitControls(
+          camera,
+          renderer.domElement
+        ) as OrbitControlsType;
 
         controls.enableDamping = false;
         controls.minDistance = 2;
