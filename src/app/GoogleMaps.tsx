@@ -2,7 +2,6 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 const GoogleMaps = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -16,13 +15,14 @@ const GoogleMaps = () => {
   const [searchResults, setSearchResults] = useState<string[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [isClient, setIsClient] = useState(false);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const moonRef = useRef<THREE.Group | null>(null);
   const animationIdRef = useRef<number | null>(null);
-  const controlsRef = useRef<OrbitControls | null>(null);
+  const controlsRef = useRef<any>(null);
   const isUserInteractingRef = useRef(false);
   const starFieldRef = useRef<{
     stars: THREE.Points;
@@ -32,7 +32,6 @@ const GoogleMaps = () => {
   const handleSearch = (e: React.KeyboardEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      // Mock search results for moon features
       const moonFeatures = [
         "Mare Tranquillitatis (Sea of Tranquility)",
         "Tycho Crater",
@@ -60,7 +59,6 @@ const GoogleMaps = () => {
   const handleSearchResultClick = (result: string) => {
     setSearchQuery(result);
     setShowSearchResults(false);
-    // Simulate moving to location
     if (controlsRef.current && moonRef.current) {
       const randomRotation = Math.random() * Math.PI * 2;
       moonRef.current.rotation.y = randomRotation;
@@ -74,45 +72,39 @@ const GoogleMaps = () => {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // Convert click position to normalized coordinates
     const normalizedX = (x / rect.width - 0.5) * 2;
     const normalizedY = (y / rect.height - 0.5) * 2;
 
-    // Update camera position based on minimap click
     const azimuth = normalizedX * Math.PI;
-    const elevation = -normalizedY * Math.PI * 0.3; // Limit elevation range
+    const elevation = -normalizedY * Math.PI * 0.3;
 
     const distance = cameraRef.current.position.length();
     const newX = distance * Math.cos(elevation) * Math.sin(azimuth);
     const newY = distance * Math.sin(elevation);
     const newZ = distance * Math.cos(elevation) * Math.cos(azimuth);
 
-    // Smoothly move camera to new position
     const startPos = cameraRef.current.position.clone();
     const endPos = new THREE.Vector3(newX, newY, newZ);
 
-    // Simple animation
     let progress = 0;
     const animate = () => {
       progress += 0.1;
       if (progress <= 1) {
         const currentPos = startPos.clone().lerp(endPos, progress);
         cameraRef.current!.position.copy(currentPos);
-        controlsRef.current!.update();
+        controlsRef.current?.update();
         requestAnimationFrame(animate);
       }
     };
     animate();
   };
 
-  // Fixed star positions for consistent SSR
   const getFixedStarPositions = () => {
     const positions = [];
-    const seed = 12345; // Fixed seed for consistency
+    const seed = 12345;
     let random = seed;
 
     for (let i = 0; i < 15; i++) {
-      // Simple pseudo-random generator for consistent results
       random = (random * 9301 + 49297) % 233280;
       const x = (random / 233280) * 100;
 
@@ -144,23 +136,19 @@ const GoogleMaps = () => {
     setShowContextMenu(false);
   };
 
-  // Create text geometry that appears on the Moon surface
   const createTextOnSurface = (
     text: string,
     position: THREE.Vector3,
     scene: THREE.Scene,
     fontSize: number = 0.05
   ) => {
-    // Create text using a canvas
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d")!;
     canvas.width = 2048;
     canvas.height = 256;
 
-    // Clear canvas first
     context.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Set text style for better centering
     context.fillStyle = "#ffffff";
     context.font = `bold ${fontSize * 1000}px Arial, sans-serif`;
     context.textAlign = "center";
@@ -170,15 +158,12 @@ const GoogleMaps = () => {
     context.shadowOffsetX = 3;
     context.shadowOffsetY = 3;
 
-    // Draw text at exact center
     context.fillText(text, canvas.width / 2, canvas.height / 2);
 
-    // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
     texture.flipY = true;
 
-    // Create material
     const material = new THREE.MeshBasicMaterial({
       map: texture,
       transparent: true,
@@ -186,29 +171,22 @@ const GoogleMaps = () => {
       side: THREE.DoubleSide,
     });
 
-    // Create geometry with better proportions for closer text
     const geometry = new THREE.PlaneGeometry(1.6, 0.2);
     const textMesh = new THREE.Mesh(geometry, material);
 
-    // Position the text correctly in front of the moon
     textMesh.position.copy(position);
-
-    // Make text face the camera properly
     textMesh.lookAt(cameraRef.current?.position || new THREE.Vector3(0, 0, 5));
 
     scene.add(textMesh);
     return textMesh;
   };
 
-  // Create simple but beautiful star field without custom shaders
   const createStarField = (scene: THREE.Scene) => {
-    // Create a simple circular texture for stars
     const canvas = document.createElement("canvas");
     canvas.width = 32;
     canvas.height = 32;
     const context = canvas.getContext("2d")!;
 
-    // Draw a simple white circle with soft edges
     const gradient = context.createRadialGradient(16, 16, 0, 16, 16, 16);
     gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
     gradient.addColorStop(0.4, "rgba(255, 255, 255, 0.8)");
@@ -219,14 +197,12 @@ const GoogleMaps = () => {
 
     const starTexture = new THREE.CanvasTexture(canvas);
 
-    // Create star geometry
     const starGeometry = new THREE.BufferGeometry();
     const starCount = 4000;
     const positions = new Float32Array(starCount * 3);
     const colors = new Float32Array(starCount * 3);
 
     for (let i = 0; i < starCount; i++) {
-      // Generate random positions on a large sphere
       const radius = 400;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(Math.random() * 2 - 1);
@@ -235,7 +211,6 @@ const GoogleMaps = () => {
       positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
       positions[i * 3 + 2] = radius * Math.cos(phi);
 
-      // Simple white colors with slight variations
       const brightness = 0.7 + Math.random() * 0.3;
       colors[i * 3] = brightness;
       colors[i * 3 + 1] = brightness;
@@ -248,7 +223,6 @@ const GoogleMaps = () => {
     );
     starGeometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
-    // Use simple PointsMaterial with the texture
     const starMaterial = new THREE.PointsMaterial({
       size: 2,
       map: starTexture,
@@ -261,7 +235,6 @@ const GoogleMaps = () => {
     const stars = new THREE.Points(starGeometry, starMaterial);
     scene.add(stars);
 
-    // Add some brighter stars
     const brightStarGeometry = new THREE.BufferGeometry();
     const brightStarCount = 300;
     const brightPositions = new Float32Array(brightStarCount * 3);
@@ -306,11 +279,10 @@ const GoogleMaps = () => {
     scene.add(brightStars);
 
     console.log(
-      "Star field created successfully with",
+      "Star field created with",
       starCount + brightStarCount,
       "stars"
     );
-
     return { stars, brightStars };
   };
 
@@ -326,7 +298,7 @@ const GoogleMaps = () => {
     scene.background = new THREE.Color(0x000000);
     sceneRef.current = scene;
 
-    // Camera setup
+    // Camera setup with better initial position
     const camera = new THREE.PerspectiveCamera(
       45,
       window.innerWidth / window.innerHeight,
@@ -337,154 +309,251 @@ const GoogleMaps = () => {
     cameraRef.current = camera;
 
     // Renderer setup
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      powerPreference: "high-performance",
+    });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = false; // Disable shadows for better performance
     rendererRef.current = renderer;
     container.appendChild(renderer.domElement);
 
-    // Create star field first
+    // Create star field
     const starField = createStarField(scene);
     starFieldRef.current = starField;
 
-    // Lighting - much brighter to match Google Earth appearance
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+    // Enhanced lighting setup
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
     directionalLight.position.set(5, 5, 5);
     scene.add(directionalLight);
 
-    // Add additional lighting for bright Moon appearance
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
     keyLight.position.set(-5, 3, 2);
     scene.add(keyLight);
 
-    // Add fill light to eliminate dark areas
-    const fillLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.6);
     fillLight.position.set(0, -5, 0);
     scene.add(fillLight);
 
-    // Load NASA Moon model
+    // Load NASA Moon model - FIXED VERSION
     const loadMoon = async () => {
       try {
+        console.log("Loading NASA Moon model...");
+
         const { GLTFLoader } = await import(
           "three/examples/jsm/loaders/GLTFLoader.js"
         );
         const loader = new GLTFLoader();
 
-        const gltf = await new Promise<unknown>((resolve, reject) => {
-          loader.load(
-            "https://solarsystem.nasa.gov/rails/active_storage/blobs/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBcllRIiwiZXhwIjpudWxsLCJwdXIiOiJibG9iX2lkIn19--7d626e5badbf2157a4fa43b9e891ab22ca767f3e/Moon_1_3474.glb",
-            resolve,
-            undefined,
-            reject
-          );
-        });
+        // Try multiple URLs: local first, then NASA as fallback
+        const moonUrls = [
+          "/moon.glb", // Local file (primary)
+          "https://solarsystem.nasa.gov/rails/active_storage/blobs/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBcllRIiwiZXhwIjpudWxsLCJwdXIiOiJibG9iX2lkIn19--7d626e5badbf2157a4fa43b9e891ab22ca767f3e/Moon_1_3474.glb", // NASA fallback
+        ];
 
-        if (gltf && typeof gltf === "object" && "scene" in gltf) {
-          const moonModel = (gltf as { scene: THREE.Group }).scene;
+        let modelLoaded = false;
 
-          // Scale and position
-          const box = new THREE.Box3().setFromObject(moonModel);
-          const size = box.getSize(new THREE.Vector3());
-          const center = box.getCenter(new THREE.Vector3());
-          const maxDim = Math.max(size.x, size.y, size.z);
-          const scale = 2 / maxDim;
+        for (const url of moonUrls) {
+          if (modelLoaded) break;
 
-          moonModel.scale.setScalar(scale);
-          moonModel.position.x = -center.x * scale;
-          moonModel.position.y = -center.y * scale;
-          moonModel.position.z = -center.z * scale;
+          try {
+            console.log(`Trying to load moon from: ${url}`);
 
-          // Enhance Moon materials for proper NASA appearance
-          moonModel.traverse((child: THREE.Object3D) => {
-            if (child instanceof THREE.Mesh) {
-              if (child.material) {
-                if (Array.isArray(child.material)) {
-                  child.material.forEach((mat: THREE.Material) => {
-                    const material = mat as
-                      | THREE.MeshStandardMaterial
-                      | THREE.MeshPhongMaterial;
-                    if (
-                      material.type === "MeshStandardMaterial" ||
-                      material.type === "MeshPhongMaterial"
-                    ) {
-                      // Brighten the Moon materials
-                      if ("roughness" in material) material.roughness = 0.7;
-                      if ("metalness" in material) material.metalness = 0.0;
+            const gltf = await new Promise<any>((resolve, reject) => {
+              const timeoutId = setTimeout(() => {
+                reject(new Error("Model loading timeout"));
+              }, 10000);
+
+              loader.load(
+                url,
+                (result) => {
+                  clearTimeout(timeoutId);
+                  resolve(result);
+                },
+                (progress) => {
+                  console.log(
+                    "Loading progress:",
+                    (progress.loaded / progress.total) * 100 + "%"
+                  );
+                },
+                (error) => {
+                  clearTimeout(timeoutId);
+                  reject(error);
+                }
+              );
+            });
+
+            if (gltf && gltf.scene) {
+              const moonModel = gltf.scene;
+              console.log("Processing moon model...", moonModel);
+
+              // Create a group to hold the moon
+              const moonGroup = new THREE.Group();
+
+              // Add the moon model to the group
+              moonGroup.add(moonModel);
+
+              // Calculate bounding box for proper scaling
+              const box = new THREE.Box3().setFromObject(moonModel);
+              const size = box.getSize(new THREE.Vector3());
+              const center = box.getCenter(new THREE.Vector3());
+
+              console.log("Moon model size:", size);
+              console.log("Moon model center:", center);
+
+              // Scale the moon to appropriate size (2 units diameter)
+              const maxDim = Math.max(size.x, size.y, size.z);
+              const scale = 2.0 / maxDim;
+
+              moonModel.scale.setScalar(scale);
+
+              // Center the moon
+              moonModel.position.x = -center.x * scale;
+              moonModel.position.y = -center.y * scale;
+              moonModel.position.z = -center.z * scale;
+
+              // Fix materials to ensure visibility
+              moonModel.traverse((child: THREE.Object3D) => {
+                if (child instanceof THREE.Mesh) {
+                  console.log("Processing mesh:", child.name, child.material);
+
+                  if (child.material) {
+                    if (Array.isArray(child.material)) {
+                      child.material.forEach((mat: THREE.Material) => {
+                        const material = mat as any;
+                        // Ensure the material is visible
+                        material.visible = true;
+                        material.transparent = false;
+                        material.opacity = 1.0;
+
+                        if (material.color) {
+                          // Brighten the material
+                          material.color.multiplyScalar(1.3);
+                        }
+
+                        // Set material properties for better visibility
+                        if (material.type === "MeshStandardMaterial") {
+                          material.roughness = 0.8;
+                          material.metalness = 0.0;
+                          material.emissive = new THREE.Color(0x222222);
+                        }
+
+                        material.needsUpdate = true;
+                      });
+                    } else {
+                      const material = child.material as any;
+                      // Ensure the material is visible
+                      material.visible = true;
+                      material.transparent = false;
+                      material.opacity = 1.0;
+
                       if (material.color) {
-                        material.color.multiplyScalar(1.5);
+                        // Brighten the material
+                        material.color.multiplyScalar(1.3);
                       }
+
+                      // Set material properties for better visibility
+                      if (material.type === "MeshStandardMaterial") {
+                        material.roughness = 0.8;
+                        material.metalness = 0.0;
+                        material.emissive = new THREE.Color(0x222222);
+                      }
+
                       material.needsUpdate = true;
                     }
-                  });
-                } else {
-                  const material = child.material as
-                    | THREE.MeshStandardMaterial
-                    | THREE.MeshPhongMaterial;
-                  if (
-                    material.type === "MeshStandardMaterial" ||
-                    material.type === "MeshPhongMaterial"
-                  ) {
-                    // Brighten the Moon materials
-                    if ("roughness" in material) material.roughness = 0.7;
-                    if ("metalness" in material) material.metalness = 0.0;
-                    if (material.color) {
-                      material.color.multiplyScalar(1.5);
-                    }
-                    material.needsUpdate = true;
                   }
+
+                  // Ensure the mesh itself is visible
+                  child.visible = true;
+                  child.castShadow = false;
+                  child.receiveShadow = false;
                 }
-              }
+              });
+
+              // Ensure the entire model is visible
+              moonModel.visible = true;
+              moonGroup.visible = true;
+
+              // Add to scene
+              scene.add(moonGroup);
+              moonRef.current = moonGroup;
+
+              console.log("Moon model added to scene successfully!");
+              modelLoaded = true;
+
+              // Add text overlays after moon is loaded
+              setTimeout(() => {
+                createTextOnSurface(
+                  "742d35Cc6634C0532925a3b8D63C4e64c6A6E6E2",
+                  new THREE.Vector3(-0.09, 0.15, 1.05),
+                  scene,
+                  0.04
+                );
+
+                createTextOnSurface(
+                  "Pump.fun",
+                  new THREE.Vector3(-0.15, -0.05, 1.05),
+                  scene,
+                  0.035
+                );
+              }, 100);
+            } else {
+              throw new Error("Invalid GLTF model structure");
             }
-          });
+          } catch (error) {
+            console.log(`Failed to load from ${url}:`, error);
+            continue;
+          }
+        }
 
-          scene.add(moonModel);
-          moonRef.current = moonModel;
-
-          // Add text on the Moon surface - moved more to the left for better centering
-          createTextOnSurface(
-            "742d35Cc6634C0532925a3b8D63C4e64c6A6E6E2",
-            new THREE.Vector3(-0.09, 0.15, 1.05),
-            scene,
-            0.04
-          );
-
-          createTextOnSurface(
-            "Pump.fun",
-            new THREE.Vector3(-0.15, -0.05, 1.05),
-            scene,
-            0.035
-          );
-
-          console.log("Moon loaded successfully!");
+        // If no model loaded, create fallback
+        if (!modelLoaded) {
+          throw new Error("All moon model URLs failed");
         }
       } catch (error) {
-        console.error("Failed to load Moon:", error);
+        console.error("Failed to load NASA Moon model:", error);
+
+        // Create a simple visible sphere as fallback
+        console.log("Creating fallback moon sphere...");
+        const geometry = new THREE.SphereGeometry(1, 64, 32);
+        const material = new THREE.MeshLambertMaterial({
+          color: 0xcccccc,
+          emissive: 0x111111,
+        });
+
+        const moonMesh = new THREE.Mesh(geometry, material);
+        const moonGroup = new THREE.Group();
+        moonGroup.add(moonMesh);
+
+        scene.add(moonGroup);
+        moonRef.current = moonGroup;
+
+        console.log("Fallback moon created!");
       }
     };
 
     // Load OrbitControls
-    const loadControls = () => {
+    const loadControls = async () => {
       try {
+        const { OrbitControls } = await import(
+          "three/examples/jsm/controls/OrbitControls.js"
+        );
         const controls = new OrbitControls(camera, renderer.domElement);
 
-        // Disable damping for immediate, responsive control
         controls.enableDamping = false;
-        controls.dampingFactor = 0.05; // This won't be used since damping is disabled
-
         controls.minDistance = 2;
         controls.maxDistance = 10;
         controls.autoRotate = true;
         controls.autoRotateSpeed = 0.2;
-
-        // Make controls more responsive
         controls.rotateSpeed = 1.0;
         controls.zoomSpeed = 1.2;
         controls.panSpeed = 0.8;
 
-        // Add event listeners to track user interaction
         controls.addEventListener("start", () => {
           isUserInteractingRef.current = true;
         });
@@ -494,11 +563,13 @@ const GoogleMaps = () => {
         });
 
         controlsRef.current = controls;
+        console.log("OrbitControls loaded successfully!");
       } catch (error) {
-        console.error("Failed to load controls:", error);
+        console.error("Failed to load OrbitControls:", error);
       }
     };
 
+    // Initialize everything
     loadMoon();
     loadControls();
 
@@ -506,7 +577,7 @@ const GoogleMaps = () => {
     const animate = () => {
       animationIdRef.current = requestAnimationFrame(animate);
 
-      // Subtle rotation for star movement
+      // Rotate stars
       if (starFieldRef.current?.stars) {
         starFieldRef.current.stars.rotation.y += 0.0001;
         if (starFieldRef.current.brightStars) {
@@ -515,16 +586,14 @@ const GoogleMaps = () => {
         }
       }
 
+      // Update controls
       if (controlsRef.current) {
-        // Only auto-rotate when user is not interacting
         if (!isUserInteractingRef.current) {
           controlsRef.current.autoRotate = true;
         } else {
           controlsRef.current.autoRotate = false;
         }
 
-        // Since damping is disabled, we don't need to call update() every frame
-        // Only call update when needed for auto-rotation
         if (controlsRef.current.autoRotate) {
           controlsRef.current.update();
         }
@@ -544,14 +613,8 @@ const GoogleMaps = () => {
     };
     window.addEventListener("resize", handleResize);
 
+    // Cleanup function
     return () => {
-      // Close share menu and search results when clicking outside
-      const handleClickOutside = () => {
-        setShowShareMenu(false);
-        setShowSearchResults(false);
-      };
-      document.addEventListener("click", handleClickOutside);
-
       window.removeEventListener("resize", handleResize);
       if (animationIdRef.current) {
         cancelAnimationFrame(animationIdRef.current);
@@ -559,14 +622,12 @@ const GoogleMaps = () => {
       if (controlsRef.current) {
         controlsRef.current.dispose();
       }
-      if (renderer && container) {
+      if (renderer && container && container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
         renderer.dispose();
       }
-
-      document.removeEventListener("click", handleClickOutside);
     };
-  }, [showSearchResults, showShareMenu]);
+  }, []);
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-black select-none">
@@ -581,19 +642,15 @@ const GoogleMaps = () => {
         style={{ cursor: "grab" }}
       />
 
-      {/* Professional Google Earth Minimap */}
+      {/* Minimap */}
       <div className="absolute bottom-20 left-4 w-48 h-36 z-20">
-        {/* Minimap Container */}
         <div
           onClick={handleMinimapClick}
           className="w-full h-full bg-white rounded-lg shadow-xl border border-gray-300 cursor-pointer hover:shadow-2xl transition-shadow relative overflow-hidden"
           title="Click to navigate view"
         >
-          {/* Map View Area - Full height now without header */}
           <div className="absolute inset-0 bg-black">
-            {/* Space Background with Stars */}
             <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-900">
-              {/* Fixed star positions to prevent hydration mismatch */}
               {isClient &&
                 getFixedStarPositions().map((pos, i) => (
                   <div
@@ -607,42 +664,26 @@ const GoogleMaps = () => {
                 ))}
             </div>
 
-            {/* Moon Representation */}
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20">
-              {/* Moon Base */}
               <div className="w-full h-full bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400 rounded-full relative shadow-inner border border-gray-400">
-                {/* Realistic Lunar Features */}
-
-                {/* Mare Tranquillitatis (Sea of Tranquility) */}
                 <div className="absolute top-3 left-4 w-6 h-4 bg-gray-600 rounded-full opacity-80"></div>
-
-                {/* Mare Imbrium (Sea of Rains) */}
                 <div className="absolute top-1 left-2 w-4 h-5 bg-gray-650 rounded-full opacity-70"></div>
-
-                {/* Tycho Crater */}
                 <div className="absolute bottom-3 left-6 w-3 h-3 bg-gray-700 rounded-full border border-gray-500 shadow-inner"></div>
-
-                {/* Copernicus Crater */}
                 <div className="absolute top-4 right-3 w-2.5 h-2.5 bg-gray-600 rounded-full border border-gray-500"></div>
-
-                {/* Small craters */}
                 <div className="absolute top-6 left-7 w-1.5 h-1.5 bg-gray-600 rounded-full opacity-60"></div>
                 <div className="absolute bottom-2 right-4 w-1 h-1 bg-gray-600 rounded-full opacity-50"></div>
                 <div className="absolute top-2 right-6 w-1 h-1 bg-gray-600 rounded-full opacity-40"></div>
                 <div className="absolute bottom-5 left-3 w-1 h-1 bg-gray-600 rounded-full opacity-45"></div>
 
-                {/* Current View Indicator */}
                 <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
                   <div className="w-6 h-6 border-2 border-blue-400 rounded-full bg-blue-400/10 animate-pulse"></div>
                   <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-blue-400 rounded-full"></div>
                 </div>
 
-                {/* Terminator Line (Day/Night Border) */}
                 <div className="absolute top-0 right-4 bottom-0 w-px bg-gradient-to-b from-transparent via-gray-500 to-transparent opacity-30"></div>
               </div>
             </div>
 
-            {/* Coordinate Grid Overlay */}
             <div className="absolute inset-0 opacity-20">
               <svg className="w-full h-full">
                 <defs>
@@ -664,12 +705,10 @@ const GoogleMaps = () => {
               </svg>
             </div>
 
-            {/* Crosshairs */}
             <div className="absolute top-1/2 left-0 right-0 h-px bg-blue-400/40"></div>
             <div className="absolute left-1/2 top-0 bottom-0 w-px bg-blue-400/40"></div>
           </div>
 
-          {/* Footer Info */}
           <div className="absolute bottom-0 left-0 right-0 h-6 bg-gray-50 border-t border-gray-200 flex items-center justify-between px-2 text-xs text-gray-600">
             <span>3,474 km</span>
             <span>
@@ -680,7 +719,6 @@ const GoogleMaps = () => {
             </span>
           </div>
 
-          {/* Compass */}
           <div className="absolute top-2 right-2 w-6 h-6 bg-white rounded-full shadow-md border border-gray-300 flex items-center justify-center">
             <svg
               className="w-3 h-3 text-red-500"
@@ -691,18 +729,16 @@ const GoogleMaps = () => {
             </svg>
           </div>
 
-          {/* Click Interaction Hint */}
           <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
             Click to navigate
           </div>
         </div>
       </div>
 
-      {/* Right side controls - horizontal alignment at bottom right */}
+      {/* Controls */}
       <div className="absolute right-4 bottom-32 flex gap-2 z-20">
         <button
           onClick={() => {
-            // Toggle star visibility
             if (starFieldRef.current?.stars) {
               starFieldRef.current.stars.visible =
                 !starFieldRef.current.stars.visible;
@@ -721,7 +757,6 @@ const GoogleMaps = () => {
         </button>
         <button
           onClick={() => {
-            // Center moon in view
             if (moonRef.current && cameraRef.current && controlsRef.current) {
               controlsRef.current.target.set(0, 0, 0);
               controlsRef.current.update();
@@ -736,7 +771,7 @@ const GoogleMaps = () => {
         </button>
       </div>
 
-      {/* Zoom controls - moved up to make room */}
+      {/* Zoom controls */}
       <div className="absolute right-4 bottom-48 flex flex-col gap-1 z-20">
         <button
           onClick={() => {
@@ -801,7 +836,7 @@ const GoogleMaps = () => {
         </div>
       )}
 
-      {/* Top Navigation - RESTORED */}
+      {/* Top Navigation */}
       <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between z-30 pointer-events-auto">
         <div className="flex items-center gap-2 sm:gap-4">
           <div className="relative hidden sm:block">
@@ -847,7 +882,7 @@ const GoogleMaps = () => {
               </button>
             </div>
 
-            {/* Search Results Dropdown - Higher z-index */}
+            {/* Search Results */}
             {showSearchResults && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 max-h-60 overflow-y-auto z-50">
                 <div className="flex items-center justify-between p-3 border-b border-gray-200">
@@ -915,9 +950,9 @@ const GoogleMaps = () => {
             <span className="text-sm font-medium hidden sm:inline">Share</span>
           </button>
 
-          {/* Enhanced Share Menu */}
+          {/* Share Menu */}
           {showShareMenu && (
-            <div className="absolute top-16 right-0 bg-gray-900/95 backdrop-blur-md rounded-lg shadow-2xl border border-gray-700 min-w-[280px] z-50 animate-in slide-in-from-top-2 duration-200">
+            <div className="absolute top-16 right-0 bg-gray-900/95 backdrop-blur-md rounded-lg shadow-2xl border border-gray-700 min-w-[280px] z-50">
               <div className="p-4">
                 <div className="text-white font-medium mb-3 flex items-center gap-2">
                   <svg
@@ -974,33 +1009,7 @@ const GoogleMaps = () => {
                     <span>Share via Device</span>
                   </button>
 
-                  <button
-                    onClick={() => {
-                      const twitterText = encodeURIComponent(
-                        "Check out this amazing 3D Moon model on Google Earth! 🌙"
-                      );
-                      const twitterUrl = `https://twitter.com/intent/tweet?text=${twitterText}&url=${encodeURIComponent(
-                        window.location.href
-                      )}`;
-                      window.open(twitterUrl, "_blank");
-                      setShowShareMenu(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-left text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors"
-                  >
-                    <svg
-                      className="w-5 h-5 text-blue-400"
-                      fill="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z" />
-                    </svg>
-                    <span>Share on Twitter</span>
-                  </button>
-
                   <div className="pt-2 border-t border-gray-700">
-                    <div className="text-xs text-gray-500 mb-2">
-                      Quick Actions
-                    </div>
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(
@@ -1028,7 +1037,7 @@ const GoogleMaps = () => {
         </div>
       </div>
 
-      {/* Info Overlay - Changed from NASA to Google branding */}
+      {/* Info Overlay */}
       <div className="absolute top-20 left-4 z-20 pointer-events-none">
         <div className="bg-gray-900/95 text-white px-4 py-3 rounded-lg backdrop-blur-sm border border-gray-700">
           <div className="text-base sm:text-lg font-bold text-blue-400">
@@ -1041,7 +1050,7 @@ const GoogleMaps = () => {
         </div>
       </div>
 
-      {/* Bottom status bar - Google Earth style */}
+      {/* Bottom status bar */}
       <div className="absolute bottom-0 left-0 right-0 h-16 bg-gray-900/95 border-t border-gray-700 flex items-center justify-between px-4 z-20">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
