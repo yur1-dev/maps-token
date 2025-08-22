@@ -575,7 +575,7 @@ const GoogleMaps = () => {
               setTimeout(() => {
                 // Contract address - positioned to appear centered when viewing from front
                 const contractText = createCenteredTextOnSurface(
-                  "742d35Cc6634C0532925a3b8D63C4e64c6A6E6E2",
+                  "TBA",
                   5, // 5 degrees north latitude
                   90, // 90 degrees longitude to appear centered from front view
                   scene,
